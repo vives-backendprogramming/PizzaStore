@@ -43,7 +43,6 @@ Beoordeel uitsluitend de Java Spring Boot backend volgens onderstaand sjabloon. 
 | 3  | Testen                   | “Happy flows” voor alle endpoints getest                         |          |                     |
 | 3  | Testen                   | Edge cases & foutafhandeling getest                              |          |                     |
 | 3  | Testen                   | Beveiligde endpoints (verschillende rollen) getest               |          |                     |
-| 3  | Testen                   | Testcoverage-rapport aanwezig en actueel                         |          |                     |
 | 4  | REST API & documentatie  | Minstens 2 controllers geïmplementeerd                           |          |                     |
 | 4  | REST API & documentatie  | Minstens 1 controller met volledige CRUD-functionaliteit         |          |                     |
 | 4  | REST API & documentatie  | Minstens 1 controller met child-records benaderbaar              |          |                     |
