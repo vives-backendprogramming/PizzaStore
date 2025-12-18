@@ -8,6 +8,9 @@ Als student van VIVES kan je via het [GitHub Student Developer Pack](https://edu
 ## CLI
 Download and install [GitHub Copilot CLI](https://github.com/features/copilot/cli)
 
+### Model
+Gebruik `Claude Sonnet 4.5` als model
+
 ## Voer prompt uit
 - Open Commandline/Terminal venster
 - Navigeer naar je project
