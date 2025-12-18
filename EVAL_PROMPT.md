@@ -1,6 +1,6 @@
 # Zelfevaluatie checklist voor Java Spring Boot applicatie
 
-Beoordeel uitsluitend de Java Spring Boot backend volgens onderstaand sjabloon. Geef de ingevulde tabel, testcoverage en aanbevelingen zoals gespecificeerd, zonder scores of totaaloordeel. Resultaat is een markdown bestand.
+Beoordeel uitsluitend de Java Spring Boot backend volgens onderstaand sjabloon. Geef de ingevulde tabel, testcoverage en aanbevelingen zoals gespecificeerd, zonder scores of totaaloordeel. Resultaat is een markdown bestand met de naam SELFEVALUATION.md. 
 
 **Deel 1: Technisch overzicht (vooraf aan de checklist):**
 
