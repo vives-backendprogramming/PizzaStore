@@ -14,7 +14,7 @@ Beoordeel uitsluitend de Java Spring Boot backend volgens onderstaand sjabloon. 
 
 ---
 
-**Deel 2: Checklist (volgens `EVALUATIE.md`, alleen Spring Boot/backend):**
+**Deel 2: Checklist (alleen Spring Boot/backend):**
 
 - **Enkel beoordelen op basis van de Java & Spring Boot applicatie in deze repo; andere technologieën/folders negeren**
 - Per punt:
