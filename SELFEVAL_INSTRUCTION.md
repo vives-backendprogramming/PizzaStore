@@ -20,6 +20,8 @@ Gebruik `Claude Sonnet 4.5` als model
 ## Resultaat
 Een document `SELFEVALUATION.md` wordt aangemaakt in de root van je project
 
+**Verplicht**: commit en push het gegenereerde `SELFEVALUATION.md` bestand in de root van je project. Zorg dat je Swagger-url op productie hier zeker in staat!
+
 ## Belangrijke bemerkingen
-- Dit document dient als hulpmiddel voor jou als student om zelf na te gaan wat nog beter kan in je applicatie
-- Wees kritisch met de verkregen output. 
+- Dit document dient als hulpmiddel voor jou als student om zelf na te gaan wat nog beter kan/ontbreekt in je applicatie
+- Wees kritisch met de verkregen output.
