@@ -20,10 +20,10 @@ Gebruik `Claude Sonnet 4.5` als model
 ## Resultaat
 Een document `SELFEVALUATION.md` wordt aangemaakt in de root van je project
 
-**Verplicht**: commit en push het gegenereerde `SELFEVALUATION.md` bestand in de root van je project. Zorg dat je Swagger-url op productie hier zeker in vermeld staat!
+**Verplicht**: commit en push het gegenereerde `SELFEVALUATION.md` bestand in de root van je Java Backend project. Zorg dat je Swagger-url op productie hier zeker in vermeld staat!
 
 ## Belangrijke bemerkingen
-- Dit document dient als hulpmiddel voor jou als student om zelf na te gaan wat nog beter kan/ontbreekt in je applicatie
-- Wees kritisch met de verkregen output. 
-- Bekijk of het voor jouw applicatie nuttig is om aan te passen naar de gegeven feedback.
-- Je hoeft niet te streven naar 100% ✅
+- Dit document is een hulpmiddel om jezelf kritisch te evalueren en te ontdekken wat er nog ontbreekt of beter kan aan je applicatie.
+- Ga bewust en kritisch om met de gegenereerde output. Niet alles is altijd relevant. Bepaal zelf welke feedback voor jouw project nuttig is.
+- Je hoeft niet te streven naar 100% ✅'tjes in de lijst 
+- Het zelf aanpassen of beïnvloeden van het gegenereerde document om een beter beeld te schetsen van je project wordt gezien als examenfraude. Nuttig aanvullingen of verduidelijkingen zijn wel toegestaan.
