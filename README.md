@@ -5,7 +5,7 @@ Een complete REST API voor pizzabeheer gebouwd met Spring Boot, inclusief JWT au
 ## Technologieën
 
 - **Java 25**
-- **Spring Boot 3.5.7**
+- **Spring Boot 4.0.4**
 - **Spring Security** met JWT authenticatie
 - **Spring Data JPA** met H2 database
 - **MapStruct** voor object mapping
