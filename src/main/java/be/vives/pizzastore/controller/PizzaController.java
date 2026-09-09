@@ -4,6 +4,7 @@ import be.vives.pizzastore.dto.request.CreatePizzaRequest;
 import be.vives.pizzastore.dto.request.UpdatePizzaRequest;
 import be.vives.pizzastore.dto.response.PizzaResponse;
 import be.vives.pizzastore.service.PizzaService;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -127,7 +128,7 @@ public class PizzaController {
             @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token missing or invalid"),
             @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN role required")
     })
-    public ResponseEntity<PizzaResponse> createPizza(@RequestBody CreatePizzaRequest request) {
+    public ResponseEntity<PizzaResponse> createPizza(@Valid @RequestBody CreatePizzaRequest request) {
         log.debug("POST /api/pizzas - {}", request);
 
         PizzaResponse created = pizzaService.create(request);
@@ -160,7 +161,7 @@ public class PizzaController {
     })
     public ResponseEntity<PizzaResponse> updatePizza(
             @Parameter(description = "Pizza ID", required = true) @PathVariable Long id,
-            @RequestBody UpdatePizzaRequest request) {
+            @Valid @RequestBody UpdatePizzaRequest request) {
 
         log.debug("PUT /api/pizzas/{} - {}", id, request);
 

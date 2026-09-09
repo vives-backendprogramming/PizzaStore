@@ -30,6 +30,7 @@ import java.util.Optional;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -159,9 +160,8 @@ class PizzaControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void createPizza_InvalidRequest_StillCreates() throws Exception {
+    void createPizza_InvalidRequest_ReturnsBadRequest() throws Exception {
         // Given - invalid request (blank name, negative price)
-        // Note: Validation is not enforced at controller level without @Valid annotation
         CreatePizzaRequest request = new CreatePizzaRequest(
                 "",
                 new BigDecimal("-5.00"),
@@ -170,17 +170,14 @@ class PizzaControllerTest {
                 null
         );
 
-        PizzaResponse response = new PizzaResponse(1L, "", new BigDecimal("-5.00"), "Short", null, true, null);
-        when(pizzaService.create(any(CreatePizzaRequest.class))).thenReturn(response);
-
-        // When / Then - without @Valid, invalid requests are still processed
+        // When / Then - @Valid rejects the request before it reaches the service
         mockMvc.perform(post("/api/pizzas")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isBadRequest());
 
-        verify(pizzaService).create(any(CreatePizzaRequest.class));
+        verify(pizzaService, never()).create(any(CreatePizzaRequest.class));
     }
 
     @Test
