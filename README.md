@@ -97,4 +97,4 @@ mvn test
 - Spring Boot DevTools voor hot reload
 - JPA Auditing voor created/updated tracking
 - Validation met Jakarta Bean Validation
-- Exception handling met custom error responses
+- Exception handling volgens RFC 7807 (ProblemDetail)

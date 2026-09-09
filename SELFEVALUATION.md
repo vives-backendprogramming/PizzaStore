@@ -9,7 +9,7 @@ De PizzaStore applicatie is een volledige RESTful API voor het beheren van een p
 ### 2. Versies
 
 - **Java versie**: 25
-- **Spring Boot versie**: 3.5.7
+- **Spring Boot versie**: 4.0.4
 
 ### 3. URL Swagger/OpenAPI-documentatie
 
@@ -88,7 +88,7 @@ De PizzaStore applicatie is een volledige RESTful API voor het beheren van een p
 | 0  | Algemeen                 | Alle code compileert                                             | ✅       | Maven compile succesvol |
 | 0  | Algemeen                 | Maven build succesvol                                            | ✅       | Build en tests slagen (132 tests) |
 | 0  | Algemeen                 | Dependency Injection overal correct gebruikt                     | ✅       | Constructor injection gebruikt in alle controllers, services |
-| 0  | Algemeen                 | Java versie is 25 en minstens Spring Boot 3                      | ✅       | Java 25, Spring Boot 3.5.7 |
+| 0  | Algemeen                 | Java versie is 25 en minstens Spring Boot 3                      | ✅       | Java 25, Spring Boot 4.0.4 |
 | 1  | Functionele werking      | App start vlot op met dev-profiel                                | ✅       | Start zonder fouten met H2 database |
 | 1  | Functionele werking      | Alle endpoints functioneren foutloos (CRUD, filtering, security) | ✅       | Alle operaties gedekt in tests |
 | 1  | Functionele werking      | Geen 5xx-fouten bij gebruik                                      | ✅       | GlobalExceptionHandler vangt alle exceptions op |
