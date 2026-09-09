@@ -55,7 +55,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ProblemDetail handleBusinessException(BusinessException ex, WebRequest request) {
         log.warn("Business logic error: {}", ex.getMessage());
-        return buildProblemDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), "business-rule", request);
+        return buildProblemDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), "business-rule", request);
+    }
+
+    @ExceptionHandler(PizzaStoreException.class)
+    public ProblemDetail handlePizzaStoreException(PizzaStoreException ex, WebRequest request) {
+        log.warn("PizzaStore business error: {}", ex.getMessage());
+        return buildProblemDetail(HttpStatus.BAD_REQUEST, ex.getMessage(), "business-rule", request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
