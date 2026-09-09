@@ -229,6 +229,23 @@ class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void createOrder_withInvalidOrderLine_shouldReturnBadRequest() throws Exception {
+        // Arrange - negative quantity must be rejected before it ever reaches the service
+        CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest(1L, -5);
+        CreateOrderRequest request = new CreateOrderRequest(1L, List.of(lineRequest));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/orders")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(orderService, never()).create(any());
+    }
+
+    @Test
     @WithMockUser(roles = "ADMIN")
     void updateOrderStatus_whenExists_shouldReturnUpdatedOrder() throws Exception {
         // Arrange
