@@ -5,6 +5,7 @@ import be.vives.pizzastore.dto.request.CreateOrderRequest;
 import be.vives.pizzastore.dto.request.UpdateOrderStatusRequest;
 import be.vives.pizzastore.dto.response.OrderLineResponse;
 import be.vives.pizzastore.dto.response.OrderResponse;
+import be.vives.pizzastore.exception.BusinessException;
 import be.vives.pizzastore.exception.GlobalExceptionHandler;
 import be.vives.pizzastore.security.JwtUtil;
 import be.vives.pizzastore.security.SecurityConfig;
@@ -203,6 +204,31 @@ class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void createOrder_whenCustomerNotFound_shouldReturnProblemDetail() throws Exception {
+        // Arrange
+        CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest(1L, 2);
+        CreateOrderRequest request = new CreateOrderRequest(999L, List.of(lineRequest));
+
+        when(orderService.create(any(CreateOrderRequest.class)))
+                .thenThrow(new BusinessException("Customer with id 999 not found"));
+
+        // Act & Assert
+        mockMvc.perform(post("/api/orders")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status", is(422)))
+                .andExpect(jsonPath("$.title", is("Unprocessable Content")))
+                .andExpect(jsonPath("$.detail", is("Customer with id 999 not found")))
+                .andExpect(jsonPath("$.type", is("https://api.pizzastore.example.com/errors/business-rule")));
+
+        verify(orderService).create(any(CreateOrderRequest.class));
+    }
+
+    @Test
     @WithMockUser(roles = "ADMIN")
     void updateOrderStatus_whenExists_shouldReturnUpdatedOrder() throws Exception {
         // Arrange
@@ -239,6 +265,24 @@ class OrderControllerTest {
                 .andExpect(status().isNotFound());
 
         verify(orderService).updateStatus(eq(999L), eq(OrderStatus.PREPARING));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void updateOrderStatus_withInvalidStatusValue_shouldReturnProblemDetail() throws Exception {
+        // Act & Assert
+        mockMvc.perform(patch("/api/orders/1/status")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"NOT_A_REAL_STATUS\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.detail", is(
+                        "Invalid OrderStatus value. Allowed values: PENDING, CONFIRMED, PREPARING, READY, DELIVERED, CANCELLED")))
+                .andExpect(jsonPath("$.type", is("https://api.pizzastore.example.com/errors/malformed-request")));
+
+        verify(orderService, never()).updateStatus(any(), any());
     }
 
     @Test
