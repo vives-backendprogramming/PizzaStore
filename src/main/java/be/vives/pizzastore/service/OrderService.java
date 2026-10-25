@@ -4,6 +4,7 @@ import be.vives.pizzastore.domain.*;
 import be.vives.pizzastore.dto.request.CreateOrderRequest;
 import be.vives.pizzastore.dto.response.OrderResponse;
 import be.vives.pizzastore.exception.BusinessException;
+import be.vives.pizzastore.exception.ResourceNotFoundException;
 import be.vives.pizzastore.mapper.OrderMapper;
 import be.vives.pizzastore.repository.CustomerRepository;
 import be.vives.pizzastore.repository.OrderRepository;
@@ -47,11 +48,8 @@ public class OrderService {
 
     public Page<OrderResponse> findByCustomerId(Long customerId, Pageable pageable) {
         log.debug("Finding orders for customer: {}", customerId);
-        Page<Order> orderPage = orderRepository.findAll(pageable);
-        Page<Order> filteredOrders = orderPage
-                .map(order -> order.getCustomer().getId().equals(customerId) ? order : null)
-                .map(order -> order);
-        return filteredOrders.map(orderMapper::toResponse);
+        Page<Order> orderPage = orderRepository.findByCustomerId(customerId, pageable);
+        return orderPage.map(orderMapper::toResponse);
     }
 
     public Page<OrderResponse> findByStatus(OrderStatus status, Pageable pageable) {
@@ -69,19 +67,18 @@ public class OrderService {
 
     public OrderResponse findById(Long id) {
         log.debug("Finding order with id: {}", id);
-        Order order = orderRepository.findByIdWithOrderLines(id).orElse(null);
-        if (order == null) {
-            return null;
-        }
+        Order order = orderRepository.findByIdWithOrderLines(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", id));
         return orderMapper.toResponse(order);
     }
 
-    public OrderResponse create(CreateOrderRequest request) {
-        log.debug("Creating new order for customer: {}", request.customerId());
+    // customerEmail is the username of the logged-in user, never a value from the request body
+    public OrderResponse create(String customerEmail, CreateOrderRequest request) {
+        log.debug("Creating new order for customer: {}", customerEmail);
 
-        Customer customer = customerRepository.findById(request.customerId()).orElse(null);
+        Customer customer = customerRepository.findByEmail(customerEmail).orElse(null);
         if (customer == null) {
-            throw new BusinessException("Customer with id " + request.customerId() + " not found");
+            throw new BusinessException("Customer with email " + customerEmail + " not found");
         }
 
         String orderNumber = generateOrderNumber();
@@ -110,11 +107,9 @@ public class OrderService {
 
     public OrderResponse updateStatus(Long id, OrderStatus status) {
         log.debug("Updating order {} status to: {}", id, status);
-        Order order = orderRepository.findById(id).orElse(null);
-        if (order == null) {
-            return null;
-        }
-        
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", id));
+
         order.setStatus(status);
         Order updatedOrder = orderRepository.save(order);
         log.info("Updated order {} status to: {}", id, status);
@@ -123,11 +118,9 @@ public class OrderService {
 
     public void cancel(Long id) {
         log.debug("Cancelling order with id: {}", id);
-        Order order = orderRepository.findById(id).orElse(null);
-        if (order == null) {
-            throw new BusinessException("Order with id " + id + " not found");
-        }
-        
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", id));
+
         // Business rule: Cannot cancel delivered orders
         if (order.getStatus() == OrderStatus.DELIVERED) {
             throw new BusinessException("Cannot cancel order with status " + order.getStatus());

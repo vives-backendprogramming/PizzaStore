@@ -7,6 +7,7 @@ import be.vives.pizzastore.domain.Pizza;
 import be.vives.pizzastore.dto.request.CreateOrderRequest;
 import be.vives.pizzastore.dto.response.OrderResponse;
 import be.vives.pizzastore.exception.BusinessException;
+import be.vives.pizzastore.exception.ResourceNotFoundException;
 import be.vives.pizzastore.mapper.OrderMapper;
 import be.vives.pizzastore.repository.CustomerRepository;
 import be.vives.pizzastore.repository.OrderRepository;
@@ -93,7 +94,7 @@ class OrderServiceTest {
         OrderResponse response2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe", 
                 List.of(), BigDecimal.valueOf(30.00), OrderStatus.PENDING, LocalDateTime.now());
 
-        when(orderRepository.findAll(pageable)).thenReturn(page);
+        when(orderRepository.findByCustomerId(1L, pageable)).thenReturn(page);
         when(orderMapper.toResponse(order1)).thenReturn(response1);
         when(orderMapper.toResponse(order2)).thenReturn(response2);
 
@@ -102,7 +103,7 @@ class OrderServiceTest {
 
         // Assert
         assertThat(result).hasSize(2);
-        verify(orderRepository).findAll(pageable);
+        verify(orderRepository).findByCustomerId(1L, pageable);
     }
 
     @Test
@@ -151,15 +152,14 @@ class OrderServiceTest {
     }
 
     @Test
-    void findById_whenNotExists_shouldReturnNull() {
+    void findById_whenNotExists_shouldThrowResourceNotFoundException() {
         // Arrange
         when(orderRepository.findByIdWithOrderLines(999L)).thenReturn(Optional.empty());
 
-        // Act
-        OrderResponse result = orderService.findById(999L);
-
-        // Assert
-        assertThat(result).isNull();
+        // Act & Assert
+        assertThatThrownBy(() -> orderService.findById(999L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Order with id 999 not found");
         verify(orderRepository).findByIdWithOrderLines(999L);
     }
 
@@ -174,13 +174,13 @@ class OrderServiceTest {
 
         CreateOrderRequest.OrderLineRequest lineRequest1 = new CreateOrderRequest.OrderLineRequest(1L, 2);
         CreateOrderRequest.OrderLineRequest lineRequest2 = new CreateOrderRequest.OrderLineRequest(2L, 1);
-        CreateOrderRequest request = new CreateOrderRequest(1L, Arrays.asList(lineRequest1, lineRequest2));
+        CreateOrderRequest request = new CreateOrderRequest(Arrays.asList(lineRequest1, lineRequest2));
 
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
         OrderResponse response = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
                 List.of(), BigDecimal.valueOf(27.00), OrderStatus.PENDING, LocalDateTime.now());
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
         when(pizzaRepository.findById(1L)).thenReturn(Optional.of(pizza1));
         when(pizzaRepository.findById(2L)).thenReturn(Optional.of(pizza2));
         when(orderRepository.count()).thenReturn(0L);
@@ -188,12 +188,12 @@ class OrderServiceTest {
         when(orderMapper.toResponse(order)).thenReturn(response);
 
         // Act
-        OrderResponse result = orderService.create(request);
+        OrderResponse result = orderService.create("john@example.com", request);
 
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.orderNumber()).isEqualTo("ORD-2024-000001");
-        verify(customerRepository).findById(1L);
+        verify(customerRepository).findByEmail("john@example.com");
         verify(pizzaRepository).findById(1L);
         verify(pizzaRepository).findById(2L);
         verify(orderRepository).save(any(Order.class));
@@ -202,16 +202,16 @@ class OrderServiceTest {
     @Test
     void create_whenCustomerNotFound_shouldThrowException() {
         // Arrange
-        CreateOrderRequest request = new CreateOrderRequest(999L, List.of());
-        when(customerRepository.findById(999L)).thenReturn(Optional.empty());
+        CreateOrderRequest request = new CreateOrderRequest(List.of());
+        when(customerRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.create(request))
+        assertThatThrownBy(() -> orderService.create("ghost@example.com", request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Customer")
-                .hasMessageContaining("999");
+                .hasMessageContaining("ghost@example.com");
 
-        verify(customerRepository).findById(999L);
+        verify(customerRepository).findByEmail("ghost@example.com");
         verify(orderRepository, never()).save(any());
     }
 
@@ -220,18 +220,18 @@ class OrderServiceTest {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
         CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest(999L, 1);
-        CreateOrderRequest request = new CreateOrderRequest(1L, List.of(lineRequest));
+        CreateOrderRequest request = new CreateOrderRequest(List.of(lineRequest));
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
         when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.create(request))
+        assertThatThrownBy(() -> orderService.create("john@example.com", request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Pizza")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).findById(1L);
+        verify(customerRepository).findByEmail("john@example.com");
         verify(pizzaRepository).findById(999L);
         verify(orderRepository, never()).save(any());
     }
@@ -244,17 +244,17 @@ class OrderServiceTest {
         pizza.setAvailable(false);
 
         CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest(1L, 1);
-        CreateOrderRequest request = new CreateOrderRequest(1L, List.of(lineRequest));
+        CreateOrderRequest request = new CreateOrderRequest(List.of(lineRequest));
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
         when(pizzaRepository.findById(1L)).thenReturn(Optional.of(pizza));
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.create(request))
+        assertThatThrownBy(() -> orderService.create("john@example.com", request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("not available");
 
-        verify(customerRepository).findById(1L);
+        verify(customerRepository).findByEmail("john@example.com");
         verify(pizzaRepository).findById(1L);
         verify(orderRepository, never()).save(any());
     }
@@ -282,15 +282,13 @@ class OrderServiceTest {
     }
 
     @Test
-    void updateStatus_whenNotExists_shouldReturnNull() {
+    void updateStatus_whenNotExists_shouldThrowResourceNotFoundException() {
         // Arrange
         when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
-        // Act
-        OrderResponse result = orderService.updateStatus(999L, OrderStatus.PREPARING);
-
-        // Assert
-        assertThat(result).isNull();
+        // Act & Assert
+        assertThatThrownBy(() -> orderService.updateStatus(999L, OrderStatus.PREPARING))
+                .isInstanceOf(ResourceNotFoundException.class);
         verify(orderRepository).findById(999L);
         verify(orderRepository, never()).save(any());
     }
@@ -319,7 +317,7 @@ class OrderServiceTest {
 
         // Act & Assert
         assertThatThrownBy(() -> orderService.cancel(999L))
-                .isInstanceOf(BusinessException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Order")
                 .hasMessageContaining("999");
 

@@ -35,6 +35,9 @@ Een complete REST API voor pizzabeheer gebouwd met Spring Boot, inclusief JWT au
 ### Security
 - JWT authenticatie
 - Role-based access control (CUSTOMER, ADMIN)
+- Method security (`@PreAuthorize`, `@IsAdmin`, `@IsAdminOrOwner`): een klant ziet en wijzigt enkel zijn eigen account en bestelt enkel voor zichzelf; `GET /api/customers/me`
+- Wachtwoorden als BCrypt-hash via `DelegatingPasswordEncoder` (`{bcrypt}`-prefix)
+- CORS voor browser-front-ends (`pizzastore.cors.allowed-origins`)
 - Beveiligde endpoints
 
 ## Project Structuur
@@ -55,7 +58,7 @@ src/main/java/be/vives/pizzastore/
 
 Na het starten van de applicatie is de Swagger UI beschikbaar op: 
 ```
-http://localhost:8080/swagger-ui. html
+http://localhost:8080/swagger-ui.html
 ```
 
 ## Starten van de Applicatie

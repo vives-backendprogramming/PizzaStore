@@ -4,6 +4,8 @@ import be.vives.pizzastore.domain.OrderStatus;
 import be.vives.pizzastore.dto.request.CreateOrderRequest;
 import be.vives.pizzastore.dto.request.UpdateOrderStatusRequest;
 import be.vives.pizzastore.dto.response.OrderResponse;
+import be.vives.pizzastore.security.CurrentUser;
+import be.vives.pizzastore.security.IsAdminOrOrderOwner;
 import be.vives.pizzastore.service.OrderService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -81,10 +83,12 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
+    // an admin, or the customer who placed the order (a URL pattern cannot tell whose order /api/orders/12 is)
     @GetMapping("/{id}")
+    @IsAdminOrOrderOwner
     @Operation(
             summary = "Get order by ID",
-            description = "Retrieves a single order by its unique identifier. Requires ADMIN role."
+            description = "Retrieves a single order by its unique identifier. Requires ADMIN role, or CUSTOMER role for an order you placed yourself."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -93,23 +97,21 @@ public class OrderController {
                     content = @Content(schema = @Schema(implementation = OrderResponse.class))
             ),
             @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token missing or invalid"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN role required"),
-            @ApiResponse(responseCode = "404", description = "Order not found")
+            @ApiResponse(responseCode = "403", description = "Forbidden - not an admin and not your own order (also for an unknown order id)"),
+            @ApiResponse(responseCode = "404", description = "Order not found (for an admin)")
     })
     public ResponseEntity<OrderResponse> getOrder(
             @Parameter(description = "Order ID", required = true) @PathVariable Long id) {
         log.debug("GET /api/orders/{}", id);
         OrderResponse order = orderService.findById(id);
-        if (order == null) {
-            return ResponseEntity.notFound().build();
-        }
         return ResponseEntity.ok(order);
     }
 
+    // SecurityConfig: only a CUSTOMER may POST here; the order is for the logged-in customer, taken from the JWT
     @PostMapping
     @Operation(
             summary = "Create a new order",
-            description = "Creates a new order. Requires CUSTOMER role. Order is created with status PENDING."
+            description = "Creates a new order for the logged-in customer (taken from the JWT, not from the request body). Requires CUSTOMER role. Order is created with status PENDING."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -117,15 +119,16 @@ public class OrderController {
                     description = "Order created successfully",
                     content = @Content(schema = @Schema(implementation = OrderResponse.class))
             ),
-            @ApiResponse(responseCode = "400", description = "Invalid request data or business rule violation"),
+            @ApiResponse(responseCode = "400", description = "Invalid request data (validation failed or malformed JSON)"),
             @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token missing or invalid"),
             @ApiResponse(responseCode = "403", description = "Forbidden - CUSTOMER role required"),
-            @ApiResponse(responseCode = "404", description = "Customer or pizza not found")
+            @ApiResponse(responseCode = "422", description = "Business rule violation - unknown pizza or pizza not available")
     })
-    public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
-        log.debug("POST /api/orders - {}", request);
+    public ResponseEntity<OrderResponse> createOrder(@Parameter(hidden = true) @CurrentUser String email,
+                                                     @Valid @RequestBody CreateOrderRequest request) {
+        log.debug("POST /api/orders - {} - {}", email, request);
 
-        OrderResponse created = orderService.create(request);
+        OrderResponse created = orderService.create(email, request);
 
         URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
@@ -147,7 +150,7 @@ public class OrderController {
                     description = "Order status updated successfully",
                     content = @Content(schema = @Schema(implementation = OrderResponse.class))
             ),
-            @ApiResponse(responseCode = "400", description = "Invalid status or business rule violation"),
+            @ApiResponse(responseCode = "400", description = "Invalid status value"),
             @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token missing or invalid"),
             @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN role required"),
             @ApiResponse(responseCode = "404", description = "Order not found")
@@ -159,22 +162,22 @@ public class OrderController {
         log.debug("PATCH /api/orders/{}/status - {}", id, request.status());
 
         OrderResponse updated = orderService.updateStatus(id, request.status());
-        if (updated == null) {
-            return ResponseEntity.notFound().build();
-        }
         return ResponseEntity.ok(updated);
     }
 
+    // an admin, or the customer who placed the order; the business rules in OrderService still apply
     @DeleteMapping("/{id}")
+    @IsAdminOrOrderOwner
     @Operation(
             summary = "Cancel an order",
-            description = "Cancels an order by setting its status to CANCELLED. Requires ADMIN role."
+            description = "Cancels an order by setting its status to CANCELLED. Requires ADMIN role, or CUSTOMER role for an order you placed yourself."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Order cancelled successfully"),
             @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token missing or invalid"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN role required"),
-            @ApiResponse(responseCode = "404", description = "Order not found")
+            @ApiResponse(responseCode = "403", description = "Forbidden - not an admin and not your own order (also for an unknown order id)"),
+            @ApiResponse(responseCode = "404", description = "Order not found (for an admin)"),
+            @ApiResponse(responseCode = "422", description = "Business rule violation - the order is already delivered or cancelled")
     })
     public ResponseEntity<Void> cancelOrder(
             @Parameter(description = "Order ID", required = true) @PathVariable Long id) {

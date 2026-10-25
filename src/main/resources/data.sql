@@ -29,16 +29,17 @@ INSERT INTO nutritional_info (calories, protein, carbohydrates, fat, pizza_id) V
 (270, 14.0, 34.0, 9.5, 12);  -- Tonno
 
 -- Customers with BCrypt encoded passwords
--- Password format: "password123" encoded with BCrypt
+-- Password format: "password123" encoded with BCrypt; the {bcrypt} prefix tells Spring Security's
+-- DelegatingPasswordEncoder which algorithm made the hash (see SecurityConfig.passwordEncoder)
 -- For testing: email: emma.johnson@example.com, password: password123
 -- For admin: email: admin@pizzastore.be, password: password123
 INSERT INTO customers (name, email, password, phone, address, role, created_at, updated_at) VALUES
-('Emma Johnson', 'emma.johnson@example.com', '$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 470 12 34 56', 'Rue de la Loi 123, 1000 Brussels', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Liam Smith', 'liam.smith@example.com', '$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 471 23 45 67', 'Meir 45, 2000 Antwerp', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Olivia Brown', 'olivia.brown@example.com', '$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 472 34 56 78', 'Korenmarkt 12, 9000 Ghent', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Noah Davis', 'noah.davis@example.com', '$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 473 45 67 89', 'Grand Place 1, 7000 Mons', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Ava Wilson', 'ava.wilson@example.com', '$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 474 56 78 90', 'Boulevard Tirou 89, 6000 Charleroi', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('Admin User', 'admin@pizzastore.be', '$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 475 67 89 01', 'Headquarters, 1000 Brussels', 'ADMIN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('Emma Johnson', 'emma.johnson@example.com', '{bcrypt}$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 470 12 34 56', 'Rue de la Loi 123, 1000 Brussels', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Liam Smith', 'liam.smith@example.com', '{bcrypt}$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 471 23 45 67', 'Meir 45, 2000 Antwerp', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Olivia Brown', 'olivia.brown@example.com', '{bcrypt}$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 472 34 56 78', 'Korenmarkt 12, 9000 Ghent', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Noah Davis', 'noah.davis@example.com', '{bcrypt}$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 473 45 67 89', 'Grand Place 1, 7000 Mons', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Ava Wilson', 'ava.wilson@example.com', '{bcrypt}$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 474 56 78 90', 'Boulevard Tirou 89, 6000 Charleroi', 'CUSTOMER', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Admin User', 'admin@pizzastore.be', '{bcrypt}$2a$10$wvw30spxLOR1gV/NYh86ruw8J1rPa8MvkZwG0ru7VuRECMfARo0ri', '+32 475 67 89 01', 'Headquarters, 1000 Brussels', 'ADMIN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Favorite Pizzas (Many-to-Many relationship)
 INSERT INTO customer_favorite_pizzas (customer_id, pizza_id) VALUES
@@ -50,14 +51,14 @@ INSERT INTO customer_favorite_pizzas (customer_id, pizza_id) VALUES
 
 -- Orders
 INSERT INTO orders (order_number, order_date, total_amount, status, customer_id, created_at, updated_at) VALUES
-('ORD-20240115-00001', '2024-01-15 12:30:00', 20.98, 'DELIVERED', 1, '2024-01-15 12:30:00', '2024-01-15 14:15:00'),
-('ORD-20240115-00002', '2024-01-15 14:00:00', 22.98, 'DELIVERED', 2, '2024-01-15 14:00:00', '2024-01-15 15:45:00'),
-('ORD-20240116-00003', '2024-01-16 10:15:00', 34.97, 'DELIVERED', 3, '2024-01-16 10:15:00', '2024-01-16 12:30:00'),
-('ORD-20240116-00004', '2024-01-16 18:45:00', 24.98, 'DELIVERED', 1, '2024-01-16 18:45:00', '2024-01-16 20:15:00'),
+('ORD-20240115-00001', '2024-01-15 12:30:00', 29.97, 'DELIVERED', 1, '2024-01-15 12:30:00', '2024-01-15 14:15:00'),
+('ORD-20240115-00002', '2024-01-15 14:00:00', 23.98, 'DELIVERED', 2, '2024-01-15 14:00:00', '2024-01-15 15:45:00'),
+('ORD-20240116-00003', '2024-01-16 10:15:00', 35.96, 'DELIVERED', 3, '2024-01-16 10:15:00', '2024-01-16 12:30:00'),
+('ORD-20240116-00004', '2024-01-16 18:45:00', 23.98, 'DELIVERED', 1, '2024-01-16 18:45:00', '2024-01-16 20:15:00'),
 ('ORD-20240117-00005', '2024-01-17 11:00:00', 13.99, 'DELIVERED', 4, '2024-01-17 11:00:00', '2024-01-17 12:45:00'),
 ('ORD-20240117-00006', '2024-01-17 19:30:00', 36.47, 'DELIVERED', 5, '2024-01-17 19:30:00', '2024-01-17 21:00:00'),
 ('ORD-20240118-00007', '2024-01-18 12:00:00', 21.98, 'READY', 2, '2024-01-18 12:00:00', '2024-01-18 12:45:00'),
-('ORD-20240118-00008', '2024-01-18 13:15:00', 32.97, 'PREPARING', 3, '2024-01-18 13:15:00', '2024-01-18 13:30:00'),
+('ORD-20240118-00008', '2024-01-18 13:15:00', 30.97, 'PREPARING', 3, '2024-01-18 13:15:00', '2024-01-18 13:30:00'),
 ('ORD-20240118-00009', '2024-01-18 17:00:00', 25.48, 'CONFIRMED', 1, '2024-01-18 17:00:00', '2024-01-18 17:05:00'),
 ('ORD-20240118-00010', '2024-01-18 19:00:00', 18.98, 'PENDING', 4, '2024-01-18 19:00:00', '2024-01-18 19:00:00');
 

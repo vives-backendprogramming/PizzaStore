@@ -1,6 +1,7 @@
 package be.vives.pizzastore.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -11,20 +12,22 @@ import java.math.BigDecimal;
 public record CreatePizzaRequest(
 
         @NotBlank(message = "Pizza name is required")
-        @Schema(description = "Name of the pizza", example = "Margherita", required = true)
+        @Schema(description = "Name of the pizza", example = "Margherita")
         String name,
 
         @NotNull(message = "Price is required")
         @DecimalMin(value = "0.01", message = "Price must be positive")
-        @Schema(description = "Price of the pizza in EUR", example = "12.50", required = true)
+        @Schema(description = "Price of the pizza in EUR", example = "12.50")
         BigDecimal price,
 
         @Schema(description = "Description of the pizza", example = "Classic pizza with tomato sauce, mozzarella, and fresh basil")
         String description,
 
-        @Schema(description = "Whether the pizza is available for ordering", example = "true", defaultValue = "true")
+        @NotNull(message = "Availability is required")
+        @Schema(description = "Whether the pizza is available for ordering", example = "true")
         Boolean available,
 
+        @Valid
         @Schema(description = "Nutritional information for the pizza")
         NutritionalInfoRequest nutritionalInfo
 ) {

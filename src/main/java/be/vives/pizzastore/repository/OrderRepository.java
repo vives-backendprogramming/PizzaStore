@@ -2,6 +2,9 @@ package be.vives.pizzastore.repository;
 
 import be.vives.pizzastore.domain.Order;
 import be.vives.pizzastore.domain.OrderStatus;
+import be.vives.pizzastore.repository.projection.PizzaSalesStatistics;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,9 +16,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByCustomerId(Long customerId);
 
+    Page<Order> findByCustomerId(Long customerId, Pageable pageable);
+
     List<Order> findByStatus(OrderStatus status);
 
     Optional<Order> findByOrderNumber(String orderNumber);
+
+    // for OrderSecurity: does this order belong to the customer with this e-mail address?
+    boolean existsByIdAndCustomerEmail(Long id, String email);
 
     // JOIN FETCH to avoid N+1 problem
     @Query("SELECT o FROM Order o JOIN FETCH o.orderLines ol JOIN FETCH ol.pizza WHERE o.id = :id")
@@ -23,4 +31,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o FROM Order o JOIN FETCH o.customer WHERE o.customer.id = :customerId")
     List<Order> findByCustomerIdWithCustomer(@Param("customerId") Long customerId);
+
+    // DTO projection: the result is a PizzaSalesStatistics record, not an Order/OrderLine entity
+    @Query("""
+            SELECT new be.vives.pizzastore.repository.projection.PizzaSalesStatistics(
+                ol.pizza.name, COUNT(ol), SUM(ol.quantity), SUM(ol.subtotal))
+            FROM Order o JOIN o.orderLines ol
+            GROUP BY ol.pizza.name
+            ORDER BY SUM(ol.quantity) DESC
+            """)
+    List<PizzaSalesStatistics> findPizzaSalesStatistics();
 }
