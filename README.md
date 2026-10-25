@@ -185,8 +185,8 @@ The JWT code itself (`JwtUtil`, `JwtAuthenticationFilter`, `CustomUserDetailsSer
 
 Two configuration details that are easy to miss:
 
-- **`spring.mongodb.uri`** is the Spring Boot 4 name of the connection property. `spring.data.mongodb.uri` is the deprecated Spring Boot 3 name.
-- **`spring.data.mongodb.representation.big-decimal=decimal128`** stores prices as real decimal numbers (BSON `Decimal128`). Queries such as `findByPriceLessThan` then compare numbers, and the aggregation can `$sum` them.
+- **`spring.mongodb.uri`** is the Spring Boot 4 name of the connection property. Most examples online use the Spring Boot 3 name `spring.data.mongodb.uri`, which Spring Boot 4 ignores: the application then silently connects to the default `mongodb://localhost/test`. Only the Spring Data settings (`auto-index-creation`, `representation.big-decimal`, ...) keep the `spring.data.mongodb` prefix.
+- **`spring.data.mongodb.representation.big-decimal=decimal128`** stores prices as real decimal numbers (BSON `Decimal128`), so queries such as `findByPriceLessThan` compare numbers and the aggregation can `$sum` them. Spring Boot 4 already does this by default; the setting makes the choice explicit, because Spring Boot 3 stored a `BigDecimal` as a string (where `"10.99" < "8.99"`).
 
 ## Development features
 
