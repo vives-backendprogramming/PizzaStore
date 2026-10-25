@@ -28,12 +28,12 @@ class PizzaJsonTest {
 
     @Test
     void serialize_PizzaResponse_ContainsAllFields() throws Exception {
-        PizzaResponse pizza = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), "Classic",
+        PizzaResponse pizza = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), "Classic",
                 "http://localhost:8080/images/margherita.png", true,
                 new NutritionalInfoResponse(266, new BigDecimal("11.0"), new BigDecimal("33.0"), new BigDecimal("10.0")));
 
         assertThat(responseJson.write(pizza))
-                .extractingJsonPathNumberValue("$.id").isEqualTo(1);
+                .extractingJsonPathStringValue("$.id").isEqualTo("1");   // a String id: a JSON string, not a number
         assertThat(responseJson.write(pizza))
                 .extractingJsonPathStringValue("$.name").isEqualTo("Margherita");
         assertThat(responseJson.write(pizza))
@@ -44,7 +44,7 @@ class PizzaJsonTest {
 
     @Test
     void serialize_PizzaResponseWithoutNutritionalInfo_WritesNull() throws Exception {
-        PizzaResponse pizza = new PizzaResponse(2L, "Marinara", new BigDecimal("7.50"), null, null, true, null);
+        PizzaResponse pizza = new PizzaResponse("2", "Marinara", new BigDecimal("7.50"), null, null, true, null);
 
         assertThat(responseJson.write(pizza)).hasJsonPathValue("$.name");
         assertThat(responseJson.write(pizza)).extractingJsonPathValue("$.nutritionalInfo").isNull();
@@ -52,7 +52,7 @@ class PizzaJsonTest {
 
     @Test
     void serialize_UsesRecordComponentNamesAsJsonProperties() throws Exception {
-        PizzaResponse pizza = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), "Classic", null, true, null);
+        PizzaResponse pizza = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), "Classic", null, true, null);
 
         // a record has no getX() methods, yet the JSON properties are plain "imageUrl", "available", ...
         assertThat(responseJson.write(pizza)).hasJsonPathBooleanValue("$.available");

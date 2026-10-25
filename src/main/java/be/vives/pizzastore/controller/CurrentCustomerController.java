@@ -137,7 +137,7 @@ public class CurrentCustomerController {
     })
     public ResponseEntity<Void> addFavoritePizza(
             @Parameter(hidden = true) @CurrentUser String email,
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long pizzaId) {
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String pizzaId) {
 
         log.debug("POST /api/customers/me/favorites/{} - {}", pizzaId, email);
         customerService.addFavoritePizza(customerId(email), pizzaId);
@@ -156,14 +156,14 @@ public class CurrentCustomerController {
     })
     public ResponseEntity<Void> removeFavoritePizza(
             @Parameter(hidden = true) @CurrentUser String email,
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long pizzaId) {
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String pizzaId) {
 
         log.debug("DELETE /api/customers/me/favorites/{} - {}", pizzaId, email);
         customerService.removeFavoritePizza(customerId(email), pizzaId);
         return ResponseEntity.noContent().build();
     }
 
-    private Long customerId(String email) {
+    private String customerId(String email) {
         return customerService.findByEmail(email).id();
     }
 }

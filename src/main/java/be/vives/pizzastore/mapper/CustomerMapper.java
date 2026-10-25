@@ -19,16 +19,14 @@ public interface CustomerMapper {
     List<CustomerResponse> toResponseList(List<Customer> customers);
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "orders", ignore = true)
-    @Mapping(target = "favoritePizzas", ignore = true)
+    @Mapping(target = "favoritePizzaIds", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "role", ignore = true)
     Customer toEntity(CreateCustomerRequest request);
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "orders", ignore = true)
-    @Mapping(target = "favoritePizzas", ignore = true)
+    @Mapping(target = "favoritePizzaIds", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "email", ignore = true)

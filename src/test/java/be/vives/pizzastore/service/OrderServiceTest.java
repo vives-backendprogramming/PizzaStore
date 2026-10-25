@@ -60,9 +60,9 @@ class OrderServiceTest {
         Page<Order> page = new PageImpl<>(Arrays.asList(order1, order2));
         Pageable pageable = PageRequest.of(0, 10);
 
-        OrderResponse response1 = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+        OrderResponse response1 = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
-        OrderResponse response2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe", 
+        OrderResponse response2 = new OrderResponse("2", "ORD-2024-000002", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(30.00), OrderStatus.PENDING, LocalDateTime.now());
 
         when(orderRepository.findAll(pageable)).thenReturn(page);
@@ -83,27 +83,27 @@ class OrderServiceTest {
     void findByCustomerId_shouldReturnCustomerOrders() {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
-        customer.setId(1L);
+        customer.setId("1");
         Order order1 = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
         Order order2 = new Order("ORD-2024-000002", customer, OrderStatus.DELIVERED);
         Page<Order> page = new PageImpl<>(Arrays.asList(order1, order2));
         Pageable pageable = PageRequest.of(0, 10);
 
-        OrderResponse response1 = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+        OrderResponse response1 = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
-        OrderResponse response2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe", 
+        OrderResponse response2 = new OrderResponse("2", "ORD-2024-000002", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(30.00), OrderStatus.PENDING, LocalDateTime.now());
 
-        when(orderRepository.findByCustomerId(1L, pageable)).thenReturn(page);
+        when(orderRepository.findByCustomerId("1", pageable)).thenReturn(page);
         when(orderMapper.toResponse(order1)).thenReturn(response1);
         when(orderMapper.toResponse(order2)).thenReturn(response2);
 
         // Act
-        Page<OrderResponse> result = orderService.findByCustomerId(1L, pageable);
+        Page<OrderResponse> result = orderService.findByCustomerId("1", pageable);
 
         // Assert
         assertThat(result).hasSize(2);
-        verify(orderRepository).findByCustomerId(1L, pageable);
+        verify(orderRepository).findByCustomerId("1", pageable);
     }
 
     @Test
@@ -113,9 +113,9 @@ class OrderServiceTest {
         Order order1 = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
         Order order2 = new Order("ORD-2024-000002", customer, OrderStatus.PENDING);
 
-        OrderResponse response1 = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+        OrderResponse response1 = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
-        OrderResponse response2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe", 
+        OrderResponse response2 = new OrderResponse("2", "ORD-2024-000002", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(30.00), OrderStatus.PENDING, LocalDateTime.now());
 
         when(orderRepository.findByStatus(OrderStatus.PENDING)).thenReturn(Arrays.asList(order1, order2));
@@ -136,31 +136,31 @@ class OrderServiceTest {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
-        OrderResponse response = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+        OrderResponse response = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
 
-        when(orderRepository.findByIdWithOrderLines(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findById("1")).thenReturn(Optional.of(order));
         when(orderMapper.toResponse(order)).thenReturn(response);
 
         // Act
-        OrderResponse result = orderService.findById(1L);
+        OrderResponse result = orderService.findById("1");
 
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.orderNumber()).isEqualTo("ORD-2024-000001");
-        verify(orderRepository).findByIdWithOrderLines(1L);
+        verify(orderRepository).findById("1");
     }
 
     @Test
     void findById_whenNotExists_shouldThrowResourceNotFoundException() {
         // Arrange
-        when(orderRepository.findByIdWithOrderLines(999L)).thenReturn(Optional.empty());
+        when(orderRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.findById(999L))
+        assertThatThrownBy(() -> orderService.findById("999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Order with id 999 not found");
-        verify(orderRepository).findByIdWithOrderLines(999L);
+        verify(orderRepository).findById("999");
     }
 
     @Test
@@ -172,17 +172,17 @@ class OrderServiceTest {
         Pizza pizza2 = new Pizza("Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza");
         pizza2.setAvailable(true);
 
-        CreateOrderRequest.OrderLineRequest lineRequest1 = new CreateOrderRequest.OrderLineRequest(1L, 2);
-        CreateOrderRequest.OrderLineRequest lineRequest2 = new CreateOrderRequest.OrderLineRequest(2L, 1);
+        CreateOrderRequest.OrderLineRequest lineRequest1 = new CreateOrderRequest.OrderLineRequest("1", 2);
+        CreateOrderRequest.OrderLineRequest lineRequest2 = new CreateOrderRequest.OrderLineRequest("2", 1);
         CreateOrderRequest request = new CreateOrderRequest(Arrays.asList(lineRequest1, lineRequest2));
 
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
-        OrderResponse response = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+        OrderResponse response = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(27.00), OrderStatus.PENDING, LocalDateTime.now());
 
         when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(pizza1));
-        when(pizzaRepository.findById(2L)).thenReturn(Optional.of(pizza2));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(pizza1));
+        when(pizzaRepository.findById("2")).thenReturn(Optional.of(pizza2));
         when(orderRepository.count()).thenReturn(0L);
         when(orderRepository.save(any(Order.class))).thenReturn(order);
         when(orderMapper.toResponse(order)).thenReturn(response);
@@ -194,8 +194,8 @@ class OrderServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.orderNumber()).isEqualTo("ORD-2024-000001");
         verify(customerRepository).findByEmail("john@example.com");
-        verify(pizzaRepository).findById(1L);
-        verify(pizzaRepository).findById(2L);
+        verify(pizzaRepository).findById("1");
+        verify(pizzaRepository).findById("2");
         verify(orderRepository).save(any(Order.class));
     }
 
@@ -219,11 +219,11 @@ class OrderServiceTest {
     void create_whenPizzaNotFound_shouldThrowException() {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
-        CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest(999L, 1);
+        CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest("999", 1);
         CreateOrderRequest request = new CreateOrderRequest(List.of(lineRequest));
 
         when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
-        when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
+        when(pizzaRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThatThrownBy(() -> orderService.create("john@example.com", request))
@@ -232,7 +232,7 @@ class OrderServiceTest {
                 .hasMessageContaining("999");
 
         verify(customerRepository).findByEmail("john@example.com");
-        verify(pizzaRepository).findById(999L);
+        verify(pizzaRepository).findById("999");
         verify(orderRepository, never()).save(any());
     }
 
@@ -243,11 +243,11 @@ class OrderServiceTest {
         Pizza pizza = new Pizza("Margherita", BigDecimal.valueOf(8.50), "Classic pizza");
         pizza.setAvailable(false);
 
-        CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest(1L, 1);
+        CreateOrderRequest.OrderLineRequest lineRequest = new CreateOrderRequest.OrderLineRequest("1", 1);
         CreateOrderRequest request = new CreateOrderRequest(List.of(lineRequest));
 
         when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(pizza));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(pizza));
 
         // Act & Assert
         assertThatThrownBy(() -> orderService.create("john@example.com", request))
@@ -255,7 +255,7 @@ class OrderServiceTest {
                 .hasMessageContaining("not available");
 
         verify(customerRepository).findByEmail("john@example.com");
-        verify(pizzaRepository).findById(1L);
+        verify(pizzaRepository).findById("1");
         verify(orderRepository, never()).save(any());
     }
 
@@ -264,32 +264,32 @@ class OrderServiceTest {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
-        OrderResponse response = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+        OrderResponse response = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe", 
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PREPARING, LocalDateTime.now());
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findById("1")).thenReturn(Optional.of(order));
         when(orderRepository.save(order)).thenReturn(order);
         when(orderMapper.toResponse(order)).thenReturn(response);
 
         // Act
-        OrderResponse result = orderService.updateStatus(1L, OrderStatus.PREPARING);
+        OrderResponse result = orderService.updateStatus("1", OrderStatus.PREPARING);
 
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.status()).isEqualTo(OrderStatus.PREPARING);
-        verify(orderRepository).findById(1L);
+        verify(orderRepository).findById("1");
         verify(orderRepository).save(order);
     }
 
     @Test
     void updateStatus_whenNotExists_shouldThrowResourceNotFoundException() {
         // Arrange
-        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+        when(orderRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.updateStatus(999L, OrderStatus.PREPARING))
+        assertThatThrownBy(() -> orderService.updateStatus("999", OrderStatus.PREPARING))
                 .isInstanceOf(ResourceNotFoundException.class);
-        verify(orderRepository).findById(999L);
+        verify(orderRepository).findById("999");
         verify(orderRepository, never()).save(any());
     }
 
@@ -299,29 +299,29 @@ class OrderServiceTest {
         Customer customer = new Customer("John Doe", "john@example.com");
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.PENDING);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findById("1")).thenReturn(Optional.of(order));
         when(orderRepository.save(order)).thenReturn(order);
 
         // Act
-        orderService.cancel(1L);
+        orderService.cancel("1");
 
         // Assert
-        verify(orderRepository).findById(1L);
+        verify(orderRepository).findById("1");
         verify(orderRepository).save(order);
     }
 
     @Test
     void cancel_whenNotExists_shouldThrowException() {
         // Arrange
-        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+        when(orderRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.cancel(999L))
+        assertThatThrownBy(() -> orderService.cancel("999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Order")
                 .hasMessageContaining("999");
 
-        verify(orderRepository).findById(999L);
+        verify(orderRepository).findById("999");
         verify(orderRepository, never()).save(any());
     }
 
@@ -331,14 +331,14 @@ class OrderServiceTest {
         Customer customer = new Customer("John Doe", "john@example.com");
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.DELIVERED);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findById("1")).thenReturn(Optional.of(order));
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.cancel(1L))
+        assertThatThrownBy(() -> orderService.cancel("1"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Cannot cancel");
 
-        verify(orderRepository).findById(1L);
+        verify(orderRepository).findById("1");
         verify(orderRepository, never()).save(any());
     }
 
@@ -348,14 +348,14 @@ class OrderServiceTest {
         Customer customer = new Customer("John Doe", "john@example.com");
         Order order = new Order("ORD-2024-000001", customer, OrderStatus.CANCELLED);
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findById("1")).thenReturn(Optional.of(order));
 
         // Act & Assert
-        assertThatThrownBy(() -> orderService.cancel(1L))
+        assertThatThrownBy(() -> orderService.cancel("1"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("already cancelled");
 
-        verify(orderRepository).findById(1L);
+        verify(orderRepository).findById("1");
         verify(orderRepository, never()).save(any());
     }
 }

@@ -1,44 +1,54 @@
 package be.vives.pizzastore.repository;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
+import be.vives.pizzastore.config.AuditorAwareImpl;
+import be.vives.pizzastore.config.MongoConfig;
 import be.vives.pizzastore.domain.Customer;
 import be.vives.pizzastore.domain.Pizza;
+import org.bson.types.ObjectId;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.boot.data.mongodb.test.autoconfigure.DataMongoTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DataJpaTest
-@Import({be.vives.pizzastore.config.JpaConfig.class, be.vives.pizzastore.config.AuditorAwareImpl.class})
+@DataMongoTest
+@Import({MongoTestcontainersConfiguration.class, MongoConfig.class, AuditorAwareImpl.class})
 class CustomerRepositoryTest {
+
+    private static final String UNKNOWN_ID = new ObjectId().toHexString();
 
     private Customer createTestCustomer(String name, String email) {
         Customer customer = new Customer(name, email);
         customer.setPassword("test123");
-        customer.setCreatedAt(java.time.LocalDateTime.now());
-        customer.setUpdatedAt(java.time.LocalDateTime.now());
         return customer;
     }
 
     @Autowired
-    private TestEntityManager entityManager;
+    private MongoTemplate mongoTemplate;
 
     @Autowired
     private CustomerRepository customerRepository;
 
+    @BeforeEach
+    void cleanDatabase() {
+        mongoTemplate.remove(new Query(), Customer.class);
+        mongoTemplate.remove(new Query(), Pizza.class);
+    }
+
     @Test
     void findByEmail_whenExists_shouldReturnCustomer() {
         // Arrange
-        Customer customer = createTestCustomer("John Doe", "john@example.com");
-        customer.setCreatedAt(java.time.LocalDateTime.now());
-        customer.setUpdatedAt(java.time.LocalDateTime.now());
-        entityManager.persist(customer);
-        entityManager.flush();
+        mongoTemplate.insert(createTestCustomer("John Doe", "john@example.com"));
 
         // Act
         Optional<Customer> found = customerRepository.findByEmail("john@example.com");
@@ -61,9 +71,7 @@ class CustomerRepositoryTest {
     @Test
     void existsByEmail_whenExists_shouldReturnTrue() {
         // Arrange
-        Customer customer = createTestCustomer("John Doe", "john@example.com");
-        entityManager.persist(customer);
-        entityManager.flush();
+        mongoTemplate.insert(createTestCustomer("John Doe", "john@example.com"));
 
         // Act
         boolean exists = customerRepository.existsByEmail("john@example.com");
@@ -82,68 +90,53 @@ class CustomerRepositoryTest {
     }
 
     @Test
-    void findByIdWithOrders_whenExists_shouldReturnCustomerWithOrders() {
-        // Arrange
-        Customer customer = createTestCustomer("John Doe", "john@example.com");
-        entityManager.persist(customer);
-        
-        // Create an order for the customer (JOIN FETCH requires at least one order)
-        be.vives.pizzastore.domain.Order order = new be.vives.pizzastore.domain.Order("ORD-TEST-001", customer, be.vives.pizzastore.domain.OrderStatus.PENDING);
-        order.setCreatedAt(java.time.LocalDateTime.now());
-        order.setUpdatedAt(java.time.LocalDateTime.now());
-        customer.addOrder(order);
-        entityManager.persist(order);
-        entityManager.flush();
+    void save_duplicateEmail_shouldBeRefusedByTheUniqueIndex() {
+        // Arrange: @Indexed(unique = true) on email, created because spring.data.mongodb.auto-index-creation=true
+        customerRepository.save(createTestCustomer("John Doe", "john@example.com"));
 
-        // Act
-        Optional<Customer> found = customerRepository.findByIdWithOrders(customer.getId());
-
-        // Assert
-        assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("John Doe");
-        assertThat(found.get().getOrders()).isNotNull();
-        assertThat(found.get().getOrders()).hasSize(1);
+        // Act + Assert: the counterpart of the unique constraint violation in the JPA version
+        assertThatThrownBy(() -> customerRepository.save(createTestCustomer("Other John", "john@example.com")))
+                .isInstanceOf(DuplicateKeyException.class);
     }
 
     @Test
-    void findByIdWithOrders_whenNotExists_shouldReturnEmpty() {
-        // Act
-        Optional<Customer> found = customerRepository.findByIdWithOrders(999L);
+    void findById_customerWithFavorites_shouldReturnTheFavoritePizzaIds() {
+        // Arrange: the JPA version needs findByIdWithFavorites (JOIN FETCH); here the ids are part of the document
+        Pizza pizza1 = mongoTemplate.insert(new Pizza("Margherita", BigDecimal.valueOf(8.50), "Classic pizza with tomato and mozzarella"));
+        Pizza pizza2 = mongoTemplate.insert(new Pizza("Pepperoni", BigDecimal.valueOf(10.00), "Spicy pepperoni pizza"));
 
-        // Assert
-        assertThat(found).isEmpty();
-    }
-
-    @Test
-    void findByIdWithFavorites_whenExists_shouldReturnCustomerWithFavorites() {
-        // Arrange
         Customer customer = createTestCustomer("John Doe", "john@example.com");
-        Pizza pizza1 = new Pizza("Margherita", BigDecimal.valueOf(8.50), "Classic pizza with tomato and mozzarella");
-        Pizza pizza2 = new Pizza("Pepperoni", BigDecimal.valueOf(10.00), "Spicy pepperoni pizza");
-        
-        entityManager.persist(pizza1);
-        entityManager.persist(pizza2);
-        entityManager.persist(customer);
-        
         customer.addFavoritePizza(pizza1);
         customer.addFavoritePizza(pizza2);
-        entityManager.flush();
+        customer.addFavoritePizza(pizza1);   // a Set: the same pizza only once, like the join table's primary key
+        mongoTemplate.insert(customer);
 
         // Act
-        Optional<Customer> found = customerRepository.findByIdWithFavorites(customer.getId());
+        Optional<Customer> found = customerRepository.findById(customer.getId());
 
         // Assert
         assertThat(found).isPresent();
-        assertThat(found.get().getName()).isEqualTo("John Doe");
-        assertThat(found.get().getFavoritePizzas()).hasSize(2);
-        assertThat(found.get().getFavoritePizzas()).extracting(Pizza::getName)
-                .containsExactlyInAnyOrder("Margherita", "Pepperoni");
+        assertThat(found.get().getFavoritePizzaIds()).containsExactlyInAnyOrder(pizza1.getId(), pizza2.getId());
     }
 
     @Test
-    void findByIdWithFavorites_whenNotExists_shouldReturnEmpty() {
+    void existsByFavoritePizzaIds_shouldTellWhetherAnyCustomerHasThePizzaAsFavorite() {
+        // Arrange
+        Pizza favorite = mongoTemplate.insert(new Pizza("Margherita", BigDecimal.valueOf(8.50), "Classic"));
+        Pizza other = mongoTemplate.insert(new Pizza("Pepperoni", BigDecimal.valueOf(10.00), "Spicy"));
+        Customer customer = createTestCustomer("John Doe", "john@example.com");
+        customer.addFavoritePizza(favorite);
+        mongoTemplate.insert(customer);
+
+        // Act + Assert
+        assertThat(customerRepository.existsByFavoritePizzaIds(favorite.getId())).isTrue();
+        assertThat(customerRepository.existsByFavoritePizzaIds(other.getId())).isFalse();
+    }
+
+    @Test
+    void findById_whenNotExists_shouldReturnEmpty() {
         // Act
-        Optional<Customer> found = customerRepository.findByIdWithFavorites(999L);
+        Optional<Customer> found = customerRepository.findById(UNKNOWN_ID);
 
         // Assert
         assertThat(found).isEmpty();
@@ -161,16 +154,15 @@ class CustomerRepositoryTest {
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getName()).isEqualTo("John Doe");
         assertThat(saved.getEmail()).isEqualTo("john@example.com");
+        assertThat(saved.getCreatedAt()).isNotNull();   // auditing
         // Note: phone and address are null since we only set name and email in constructor
     }
 
     @Test
     void deleteById_shouldRemoveCustomer() {
         // Arrange
-        Customer customer = createTestCustomer("John Doe", "john@example.com");
-        entityManager.persist(customer);
-        entityManager.flush();
-        Long customerId = customer.getId();
+        Customer customer = mongoTemplate.insert(createTestCustomer("John Doe", "john@example.com"));
+        String customerId = customer.getId();
 
         // Act
         customerRepository.deleteById(customerId);
@@ -183,17 +175,14 @@ class CustomerRepositoryTest {
     @Test
     void findAll_shouldReturnAllCustomers() {
         // Arrange
-        Customer customer1 = createTestCustomer("John Doe", "john@example.com");
-        Customer customer2 = createTestCustomer("Jane Smith", "jane@example.com");
-        entityManager.persist(customer1);
-        entityManager.persist(customer2);
-        entityManager.flush();
+        mongoTemplate.insert(createTestCustomer("John Doe", "john@example.com"));
+        mongoTemplate.insert(createTestCustomer("Jane Smith", "jane@example.com"));
 
         // Act
         var customers = customerRepository.findAll();
 
         // Assert
-        assertThat(customers).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(customers).hasSize(2);
         assertThat(customers).extracting(Customer::getName)
                 .contains("John Doe", "Jane Smith");
     }

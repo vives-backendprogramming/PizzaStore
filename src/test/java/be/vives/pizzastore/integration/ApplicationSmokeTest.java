@@ -1,5 +1,6 @@
 package be.vives.pizzastore.integration;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
 import be.vives.pizzastore.client.OpenFoodFactsClient;
 import be.vives.pizzastore.controller.CustomerController;
 import be.vives.pizzastore.controller.OrderController;
@@ -8,16 +9,18 @@ import be.vives.pizzastore.exception.GlobalExceptionHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.ApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Smoke test: does the whole application context start? Catches wrong wiring, missing beans, bad
- * properties or a broken JPA mapping in one second, before any real test runs.
+ * properties or a broken MongoDB mapping in seconds, before any real test runs.
  * {@code webEnvironment = MOCK} (the default) means no server is started.
  */
 @SpringBootTest
+@Import(MongoTestcontainersConfiguration.class)
 class ApplicationSmokeTest {
 
     @Autowired

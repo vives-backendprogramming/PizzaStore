@@ -35,8 +35,8 @@ class PizzaControllerStandaloneTest {
 
     @Test
     void getPizza_ExistingId_ReturnsPizza() {
-        when(pizzaService.findById(1L)).thenReturn(
-                new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), "Classic", null, true, null));
+        when(pizzaService.findById("1")).thenReturn(
+                new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), "Classic", null, true, null));
 
         client.get().uri("/api/pizzas/1")
                 .exchange()
@@ -47,7 +47,7 @@ class PizzaControllerStandaloneTest {
 
     @Test
     void getPizza_NonExistingId_ReturnsProblemDetail() {
-        when(pizzaService.findById(999L)).thenThrow(new ResourceNotFoundException("Pizza", 999L));
+        when(pizzaService.findById("999")).thenThrow(new ResourceNotFoundException("Pizza", "999"));
 
         client.get().uri("/api/pizzas/999")
                 .exchange()
@@ -58,8 +58,10 @@ class PizzaControllerStandaloneTest {
     }
 
     @Test
-    void getPizza_NonNumericId_Returns400() {
-        client.get().uri("/api/pizzas/abc")
+    void getPizzas_NonNumericPrice_Returns400() {
+        // On the main branch this test uses /api/pizzas/abc: a Long id cannot be "abc". On this branch an id is a
+        // String (a MongoDB ObjectId), so the type mismatch is shown with the BigDecimal maxPrice parameter instead.
+        client.get().uri("/api/pizzas?maxPrice=abc")
                 .exchange()
                 .expectStatus().isBadRequest();
     }

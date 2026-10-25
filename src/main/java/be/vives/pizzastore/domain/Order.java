@@ -1,62 +1,56 @@
 package be.vives.pizzastore.domain;
 
-import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity
-@Table(name = "orders")
-@EntityListeners(AuditingEntityListener.class)
+@Document(collection = "orders")
 public class Order {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @Column(name = "order_number", nullable = false, unique = true, length = 50)
+    @Indexed(unique = true)
     private String orderNumber;
 
-    @Column(name = "order_date", nullable = false)
     private LocalDateTime orderDate;
 
-    @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
     private OrderStatus status;
 
     @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @CreatedBy
-    @Column(name = "created_by", updatable = false)
     private String createdBy;
 
     @LastModifiedDate
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @LastModifiedBy
-    @Column(name = "updated_by")
     private String updatedBy;
 
-    // @ManyToOne: Many Orders belong to one Customer
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
+    // @ManyToOne Customer in the JPA version, a foreign key column. A document has no foreign keys: the order
+    // references its customer by id, and copies the name it shows (the "extended reference" pattern), so reading
+    // an order needs no second query. The copy is a snapshot: renaming the customer later does not change it.
+    // Never decide anything with such a copy: who owns the order is checked with customerId (see OrderSecurity).
+    @Indexed
+    private String customerId;
 
-    // @OneToMany: Order has many OrderLines
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private String customerName;
+
+    // @OneToMany with its own table in the JPA version. Order lines always belong to exactly one order and
+    // are always read and written together with it: the textbook case for embedding them in the order document.
     private List<OrderLine> orderLines = new ArrayList<>();
 
     // Constructors
@@ -65,7 +59,8 @@ public class Order {
 
     public Order(String orderNumber, Customer customer, OrderStatus status) {
         this.orderNumber = orderNumber;
-        this.customer = customer;
+        this.customerId = customer.getId();
+        this.customerName = customer.getName();
         this.status = status;
         this.orderDate = LocalDateTime.now();
         this.totalAmount = BigDecimal.ZERO;
@@ -74,13 +69,11 @@ public class Order {
     // Helper methods
     public void addOrderLine(OrderLine orderLine) {
         orderLines.add(orderLine);
-        orderLine.setOrder(this);
         calculateTotalAmount();
     }
 
     public void removeOrderLine(OrderLine orderLine) {
         orderLines.remove(orderLine);
-        orderLine.setOrder(null);
         calculateTotalAmount();
     }
 
@@ -91,11 +84,11 @@ public class Order {
     }
 
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -131,12 +124,20 @@ public class Order {
         this.status = status;
     }
 
-    public Customer getCustomer() {
-        return customer;
+    public String getCustomerId() {
+        return customerId;
     }
 
-    public void setCustomer(Customer customer) {
-        this.customer = customer;
+    public void setCustomerId(String customerId) {
+        this.customerId = customerId;
+    }
+
+    public String getCustomerName() {
+        return customerName;
+    }
+
+    public void setCustomerName(String customerName) {
+        this.customerName = customerName;
     }
 
     public List<OrderLine> getOrderLines() {
@@ -182,7 +183,7 @@ public class Order {
     @Override
     public String toString() {
         return "Order{" +
-                "id=" + id +
+                "id='" + id + '\'' +
                 ", orderNumber='" + orderNumber + '\'' +
                 ", totalAmount=" + totalAmount +
                 ", status=" + status +

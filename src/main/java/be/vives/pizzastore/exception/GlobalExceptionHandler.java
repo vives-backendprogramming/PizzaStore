@@ -108,7 +108,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) {
-        // Don't leak the SQL error to the client: log it, return a generic message
+        // Don't leak the database error to the client: log it, return a generic message.
+        // On this branch thrown by PizzaService.delete (MongoDB has no foreign keys) or for a duplicate key of a unique index
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
         return buildProblemDetail(HttpStatus.CONFLICT,
                 "The request conflicts with existing data (e.g. the resource is still referenced by other data).",

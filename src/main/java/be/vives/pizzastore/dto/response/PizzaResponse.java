@@ -3,7 +3,7 @@ package be.vives.pizzastore.dto.response;
 import java.math.BigDecimal;
 
 public record PizzaResponse(
-        Long id,
+        String id,
         String name,
         BigDecimal price,
         String description,

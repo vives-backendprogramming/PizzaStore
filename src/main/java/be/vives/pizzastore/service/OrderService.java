@@ -14,13 +14,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@Transactional
+// No @Transactional (the JPA version has it on the class): Spring Boot configures no transaction manager for
+// MongoDB, and multi-document transactions need a replica set, not the single MongoDB server used here.
+// Each save() of one document is atomic on its own, and a document holds a whole aggregate (an order with its
+// order lines), so most operations touch only one document anyway.
 public class OrderService {
 
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
@@ -46,7 +48,7 @@ public class OrderService {
         return orderPage.map(orderMapper::toResponse);
     }
 
-    public Page<OrderResponse> findByCustomerId(Long customerId, Pageable pageable) {
+    public Page<OrderResponse> findByCustomerId(String customerId, Pageable pageable) {
         log.debug("Finding orders for customer: {}", customerId);
         Page<Order> orderPage = orderRepository.findByCustomerId(customerId, pageable);
         return orderPage.map(orderMapper::toResponse);
@@ -65,9 +67,10 @@ public class OrderService {
                 ));
     }
 
-    public OrderResponse findById(Long id) {
+    public OrderResponse findById(String id) {
         log.debug("Finding order with id: {}", id);
-        Order order = orderRepository.findByIdWithOrderLines(id)
+        // the order lines are embedded in the order document: no JOIN FETCH needed
+        Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", id));
         return orderMapper.toResponse(order);
     }
@@ -105,7 +108,7 @@ public class OrderService {
         return orderMapper.toResponse(savedOrder);
     }
 
-    public OrderResponse updateStatus(Long id, OrderStatus status) {
+    public OrderResponse updateStatus(String id, OrderStatus status) {
         log.debug("Updating order {} status to: {}", id, status);
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", id));
@@ -116,7 +119,7 @@ public class OrderService {
         return orderMapper.toResponse(updatedOrder);
     }
 
-    public void cancel(Long id) {
+    public void cancel(String id) {
         log.debug("Cancelling order with id: {}", id);
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", id));

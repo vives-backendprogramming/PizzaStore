@@ -18,8 +18,9 @@ import java.math.RoundingMode;
 /**
  * Fills the {@code NutritionalInfo} of a pizza with data from Open Food Facts.
  * <p>
- * Deliberately NOT {@code @Transactional}: a database transaction (and its connection) must not stay open while
- * we wait for somebody else's server. The two database steps are short transactions in {@link PizzaService}.
+ * Two separate database steps in {@link PizzaService}, with the call to somebody else's server in between.
+ * (The JPA version stresses that this class is deliberately not {@code @Transactional}; on this branch no service is,
+ * see {@link PizzaService}.)
  */
 @Service
 public class NutritionImportService {
@@ -34,7 +35,7 @@ public class NutritionImportService {
         this.pizzaService = pizzaService;
     }
 
-    public PizzaResponse importFromBarcode(Long pizzaId, String barcode) {
+    public PizzaResponse importFromBarcode(String pizzaId, String barcode) {
         pizzaService.findById(pizzaId);   // 404 for an unknown pizza BEFORE we spend a request of our limited quota
 
         OpenFoodFactsResponse response = fetchProduct(barcode);

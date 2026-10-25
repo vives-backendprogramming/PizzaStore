@@ -63,7 +63,7 @@ public class OrderController {
             @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN role required")
     })
     public ResponseEntity<Page<OrderResponse>> getOrders(
-            @Parameter(description = "Filter by customer ID") @RequestParam(required = false) Long customerId,
+            @Parameter(description = "Filter by customer ID") @RequestParam(required = false) String customerId,
             @Parameter(description = "Filter by order status") @RequestParam(required = false) OrderStatus status,
             @ParameterObject Pageable pageable) {
 
@@ -101,7 +101,7 @@ public class OrderController {
             @ApiResponse(responseCode = "404", description = "Order not found (for an admin)")
     })
     public ResponseEntity<OrderResponse> getOrder(
-            @Parameter(description = "Order ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Order ID", required = true) @PathVariable String id) {
         log.debug("GET /api/orders/{}", id);
         OrderResponse order = orderService.findById(id);
         return ResponseEntity.ok(order);
@@ -156,7 +156,7 @@ public class OrderController {
             @ApiResponse(responseCode = "404", description = "Order not found")
     })
     public ResponseEntity<OrderResponse> updateOrderStatus(
-            @Parameter(description = "Order ID", required = true) @PathVariable Long id,
+            @Parameter(description = "Order ID", required = true) @PathVariable String id,
             @Valid @RequestBody UpdateOrderStatusRequest request) {
 
         log.debug("PATCH /api/orders/{}/status - {}", id, request.status());
@@ -180,7 +180,7 @@ public class OrderController {
             @ApiResponse(responseCode = "422", description = "Business rule violation - the order is already delivered or cancelled")
     })
     public ResponseEntity<Void> cancelOrder(
-            @Parameter(description = "Order ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Order ID", required = true) @PathVariable String id) {
         log.debug("DELETE /api/orders/{}", id);
 
         orderService.cancel(id);

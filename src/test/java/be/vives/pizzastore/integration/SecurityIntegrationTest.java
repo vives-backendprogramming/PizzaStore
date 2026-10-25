@@ -1,5 +1,6 @@
 package be.vives.pizzastore.integration;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
 import be.vives.pizzastore.dto.LoginRequest;
 import be.vives.pizzastore.dto.request.CreateCustomerRequest;
 import be.vives.pizzastore.dto.request.CreateOrderRequest;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,8 +28,8 @@ import java.util.List;
  * to the real application on a random port. Slice tests with @WithMockUser prove the role rules;
  * this test proves the whole chain (login, token, filter, role check, ownership check, controller) really works.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.datasource.url=jdbc:h2:mem:security-integration-test")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(MongoTestcontainersConfiguration.class)
 @AutoConfigureRestTestClient
 class SecurityIntegrationTest {
 
@@ -57,7 +59,7 @@ class SecurityIntegrationTest {
         return new TestAccounts(client, customerRepository, passwordEncoder).registerCustomer();
     }
 
-    private long createPizza() {
+    private String createPizza() {
         CreatePizzaRequest pizza = new CreatePizzaRequest("Security " + System.nanoTime(), new BigDecimal("9.00"), "desc", true, null);
         return client.post().uri("/api/pizzas")
                 .header(HttpHeaders.AUTHORIZATION, admin.bearer())
@@ -69,7 +71,7 @@ class SecurityIntegrationTest {
                 .returnResult().getResponseBody().id();
     }
 
-    private long placeOrder(TestAccounts.Account account) {
+    private String placeOrder(TestAccounts.Account account) {
         return client.post().uri("/api/orders")
                 .header(HttpHeaders.AUTHORIZATION, account.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -179,7 +181,7 @@ class SecurityIntegrationTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.id").isEqualTo(customer.id().intValue())
+                .jsonPath("$.id").isEqualTo(customer.id())
                 .jsonPath("$.email").isEqualTo(customer.email());
     }
 
@@ -212,17 +214,17 @@ class SecurityIntegrationTest {
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("""
-                        {"customerId": %d, "orderLines": [{"pizzaId": %d, "quantity": 1}]}
+                        {"customerId": "%s", "orderLines": [{"pizzaId": "%s", "quantity": 1}]}
                         """.formatted(other.id(), createPizza()))
                 .exchange()
                 .expectStatus().isCreated()
                 .expectBody()
-                .jsonPath("$.customerId").isEqualTo(customer.id().intValue());
+                .jsonPath("$.customerId").isEqualTo(customer.id());
     }
 
     @Test
     void customer_SeesOwnOrdersUnderMe() {
-        long orderId = placeOrder(customer);
+        String orderId = placeOrder(customer);
 
         client.get().uri("/api/customers/me/orders")
                 .header(HttpHeaders.AUTHORIZATION, customer.bearer())
@@ -230,14 +232,14 @@ class SecurityIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.content.length()").isEqualTo(1)
-                .jsonPath("$.content[0].id").isEqualTo((int) orderId);
+                .jsonPath("$.content[0].id").isEqualTo(orderId);
     }
 
     // ---------- method security: one order belongs to one customer ----------
 
     @Test
     void customer_CanReadOwnOrder_ButNotSomebodyElses() {
-        long orderId = placeOrder(customer);
+        String orderId = placeOrder(customer);
         TestAccounts.Account other = anotherCustomer();
 
         client.get().uri("/api/orders/{id}", orderId)
@@ -245,7 +247,7 @@ class SecurityIntegrationTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.customerId").isEqualTo(customer.id().intValue());
+                .jsonPath("$.customerId").isEqualTo(customer.id());
 
         client.get().uri("/api/orders/{id}", orderId)
                 .header(HttpHeaders.AUTHORIZATION, other.bearer())
@@ -276,7 +278,7 @@ class SecurityIntegrationTest {
 
     @Test
     void customer_CanCancelOwnOrder_ButNotSomebodyElses() {
-        long orderId = placeOrder(customer);
+        String orderId = placeOrder(customer);
         TestAccounts.Account other = anotherCustomer();
 
         client.delete().uri("/api/orders/{id}", orderId)

@@ -1,9 +1,11 @@
 package be.vives.pizzastore.integration;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
@@ -13,8 +15,8 @@ import org.springframework.test.web.servlet.client.RestTestClient;
  * public documentation, a lock only on secured endpoints, ProblemDetail for errors, and no parameters
  * that the server takes from the JWT.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.datasource.url=jdbc:h2:mem:openapi-documentation-test")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(MongoTestcontainersConfiguration.class)
 @AutoConfigureRestTestClient
 class OpenApiDocumentationTest {
 

@@ -23,7 +23,7 @@ import java.util.UUID;
  */
 class TestAccounts {
 
-    record Account(Long id, String email, String token) {
+    record Account(String id, String email, String token) {
         /** Value for the Authorization header. */
         String bearer() {
             return "Bearer " + token;
@@ -56,7 +56,7 @@ class TestAccounts {
                 .expectBody(AuthResponse.class)
                 .returnResult().getResponseBody();
 
-        Long id = customerRepository.findByEmail(email).orElseThrow().getId();
+        String id = customerRepository.findByEmail(email).orElseThrow().getId();
         return new Account(id, email, response.getToken());
     }
 

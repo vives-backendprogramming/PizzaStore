@@ -1,5 +1,6 @@
 package be.vives.pizzastore.integration;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
 import be.vives.pizzastore.domain.OrderStatus;
 import be.vives.pizzastore.dto.request.CreateCustomerRequest;
 import be.vives.pizzastore.dto.request.CreateOrderRequest;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,16 +29,16 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Full-stack test: the real application on a real (random) port, a real H2 database, real HTTP requests.
+ * Full-stack test: the real application on a real (random) port, a real MongoDB database
+ * (a Docker container, see {@link MongoTestcontainersConfiguration}), real HTTP requests.
  * Controller, validation, exception handler, service, mapper and repository all run for real.
  * <p>
  * {@code @AutoConfigureRestTestClient} provides a {@link RestTestClient} that is automatically bound to
- * the random port. Because the server handles each request on its own thread, a test method cannot
- * {@code @Transactional}-rollback what the server did (unlike a MockMvc test, see {@link PizzaIntegrationTest}).
- * Instead every test creates its own uniquely named data and never assumes the database is empty.
+ * the random port. MongoDB cannot roll back what a test did (there is no {@code @Transactional} rollback as in the
+ * JPA version), so every test creates its own uniquely named data and never assumes the database is empty.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.datasource.url=jdbc:h2:mem:api-integration-test")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(MongoTestcontainersConfiguration.class)
 @AutoConfigureRestTestClient
 class PizzaStoreApiIntegrationTest {
 
@@ -142,7 +144,7 @@ class PizzaStoreApiIntegrationTest {
                     .body(request)
                     .exchange()
                     .expectStatus().isCreated()
-                    .expectHeader().valueMatches("Location", "http://localhost:\\d+/api/pizzas/\\d+");
+                    .expectHeader().valueMatches("Location", "http://localhost:\\d+/api/pizzas/[0-9a-f]{24}");   // an ObjectId
         }
 
         @Test
@@ -154,7 +156,7 @@ class PizzaStoreApiIntegrationTest {
                     .exchange()
                     .expectStatus().isOk()
                     .expectBody()
-                    .jsonPath("$[?(@.id == %d)].name".formatted(cheap.id())).isEqualTo(cheap.name())
+                    .jsonPath("$[?(@.id == '%s')].name".formatted(cheap.id())).isEqualTo(cheap.name())
                     .jsonPath("$[?(@.price > 2.00)]").isEmpty();
         }
 
@@ -288,7 +290,7 @@ class PizzaStoreApiIntegrationTest {
                     .expectStatus().isOk()
                     .expectBody()
                     .jsonPath("$.content.length()").isEqualTo(1)
-                    .jsonPath("$.content[0].id").isEqualTo(order.id().intValue());
+                    .jsonPath("$.content[0].id").isEqualTo(order.id());
 
             // 3. move it through the workflow
             client.patch().uri("/api/orders/{id}/status", order.id())
@@ -321,7 +323,7 @@ class PizzaStoreApiIntegrationTest {
                     .header(HttpHeaders.AUTHORIZATION, customerAccount.bearer())
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(new CreateOrderRequest(
-                            List.of(new CreateOrderRequest.OrderLineRequest(987_654L, 1))))
+                            List.of(new CreateOrderRequest.OrderLineRequest("987654", 1))))
                     .exchange()
                     .expectStatus().isEqualTo(422);
 

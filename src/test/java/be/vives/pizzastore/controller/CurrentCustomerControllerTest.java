@@ -64,7 +64,7 @@ class CurrentCustomerControllerTest {
     private JwtUtil jwtUtil;
 
     private static CustomerResponse john() {
-        return new CustomerResponse(1L, "John Doe", JOHN, "1234567890", "123 Main St", "CUSTOMER");
+        return new CustomerResponse("1", "John Doe", JOHN, "1234567890", "123 Main St", "CUSTOMER");
     }
 
     @BeforeEach
@@ -87,8 +87,8 @@ class CurrentCustomerControllerTest {
     @WithMockUser(username = JOHN, roles = "CUSTOMER")
     void updateCurrentCustomer_updatesTheLoggedInCustomer() {
         UpdateCustomerRequest request = new UpdateCustomerRequest("John Doe Updated", JOHN, "9998887777", "456 New St");
-        CustomerResponse updated = new CustomerResponse(1L, "John Doe Updated", JOHN, "9998887777", "456 New St", "CUSTOMER");
-        when(customerService.update(eq(1L), any(UpdateCustomerRequest.class))).thenReturn(updated);
+        CustomerResponse updated = new CustomerResponse("1", "John Doe Updated", JOHN, "9998887777", "456 New St", "CUSTOMER");
+        when(customerService.update(eq("1"), any(UpdateCustomerRequest.class))).thenReturn(updated);
 
         client.put().uri("/api/customers/me")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -98,7 +98,7 @@ class CurrentCustomerControllerTest {
                 .expectBody()
                 .jsonPath("$.name").isEqualTo("John Doe Updated");
 
-        verify(customerService).update(eq(1L), any(UpdateCustomerRequest.class));
+        verify(customerService).update(eq("1"), any(UpdateCustomerRequest.class));
     }
 
     @Test
@@ -116,9 +116,9 @@ class CurrentCustomerControllerTest {
     @Test
     @WithMockUser(username = JOHN, roles = "CUSTOMER")
     void getMyOrders_returnsTheOrdersOfTheLoggedInCustomer() {
-        OrderResponse order = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe",
+        OrderResponse order = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe",
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
-        when(orderService.findByCustomerId(eq(1L), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(order)));
+        when(orderService.findByCustomerId(eq("1"), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(order)));
 
         client.get().uri("/api/customers/me/orders")
                 .exchange()
@@ -127,14 +127,14 @@ class CurrentCustomerControllerTest {
                 .jsonPath("$.content.length()").isEqualTo(1)
                 .jsonPath("$.content[0].customerId").isEqualTo(1);
 
-        verify(orderService).findByCustomerId(eq(1L), any(Pageable.class));
+        verify(orderService).findByCustomerId(eq("1"), any(Pageable.class));
     }
 
     @Test
     @WithMockUser(username = JOHN, roles = "CUSTOMER")
     void getMyFavoritePizzas_returnsTheFavoritesOfTheLoggedInCustomer() {
-        PizzaResponse margherita = new PizzaResponse(1L, "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
-        when(customerService.findFavoritePizzas(1L)).thenReturn(List.of(margherita));
+        PizzaResponse margherita = new PizzaResponse("1", "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
+        when(customerService.findFavoritePizzas("1")).thenReturn(List.of(margherita));
 
         client.get().uri("/api/customers/me/favorites")
                 .exchange()
@@ -143,31 +143,31 @@ class CurrentCustomerControllerTest {
                 .jsonPath("$.length()").isEqualTo(1)
                 .jsonPath("$[0].name").isEqualTo("Margherita");
 
-        verify(customerService).findFavoritePizzas(1L);
+        verify(customerService).findFavoritePizzas("1");
     }
 
     @Test
     @WithMockUser(username = JOHN, roles = "CUSTOMER")
     void addFavoritePizza_addsToTheLoggedInCustomer() {
-        doNothing().when(customerService).addFavoritePizza(1L, 2L);
+        doNothing().when(customerService).addFavoritePizza("1", "2");
 
         client.post().uri("/api/customers/me/favorites/{pizzaId}", 2)
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(customerService).addFavoritePizza(1L, 2L);
+        verify(customerService).addFavoritePizza("1", "2");
     }
 
     @Test
     @WithMockUser(username = JOHN, roles = "CUSTOMER")
     void removeFavoritePizza_removesFromTheLoggedInCustomer() {
-        doNothing().when(customerService).removeFavoritePizza(1L, 2L);
+        doNothing().when(customerService).removeFavoritePizza("1", "2");
 
         client.delete().uri("/api/customers/me/favorites/{pizzaId}", 2)
                 .exchange()
                 .expectStatus().isNoContent();
 
-        verify(customerService).removeFavoritePizza(1L, 2L);
+        verify(customerService).removeFavoritePizza("1", "2");
     }
 
     @Test

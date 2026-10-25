@@ -1,64 +1,48 @@
 package be.vives.pizzastore.domain;
 
-import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
-@Entity
-@Table(name = "customers")
-@EntityListeners(AuditingEntityListener.class)
+@Document(collection = "customers")
 public class Customer {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 100)
+    // the unique constraint of the JPA version; only created when spring.data.mongodb.auto-index-creation=true
+    @Indexed(unique = true)
     private String email;
 
-    @Column(nullable = false)
     private String password;
 
-    @Column(length = 20)
     private String phone;
 
-    @Column(length = 200)
     private String address;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    // an enum is stored as its name ("CUSTOMER"), like @Enumerated(EnumType.STRING) in JPA
     private Role role = Role.CUSTOMER;
 
     @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @LastModifiedDate
-    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // @OneToMany: Customer has many Orders
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Order> orders = new ArrayList<>();
+    // No List<Order> orders: a customer's orders can grow without limit, and every Order already stores
+    // its customerId. Look them up with OrderRepository.findByCustomerId(customer.getId()).
 
-    // @ManyToMany: Customer can favorite many Pizzas
-    @ManyToMany
-    @JoinTable(
-            name = "customer_favorite_pizzas",
-            joinColumns = @JoinColumn(name = "customer_id"),
-            inverseJoinColumns = @JoinColumn(name = "pizza_id")
-    )
-    private Set<Pizza> favoritePizzas = new HashSet<>();
+    // @ManyToMany with a customer_favorite_pizzas join table in the JPA version. MongoDB has no join tables:
+    // the customer document simply holds the ids of its favorite pizzas (a Set, so a pizza is in it only once).
+    private Set<String> favoritePizzaIds = new HashSet<>();
 
     // Constructors
     public Customer() {
@@ -69,33 +53,21 @@ public class Customer {
         this.email = email;
     }
 
-    // Helper methods for bidirectional relationships
-    public void addOrder(Order order) {
-        orders.add(order);
-        order.setCustomer(this);
-    }
-
-    public void removeOrder(Order order) {
-        orders.remove(order);
-        order.setCustomer(null);
-    }
-
+    // Helper methods: only the id of the pizza is stored
     public void addFavoritePizza(Pizza pizza) {
-        favoritePizzas.add(pizza);
-        pizza.getFavoritedByCustomers().add(this);
+        favoritePizzaIds.add(pizza.getId());
     }
 
     public void removeFavoritePizza(Pizza pizza) {
-        favoritePizzas.remove(pizza);
-        pizza.getFavoritedByCustomers().remove(this);
+        favoritePizzaIds.remove(pizza.getId());
     }
 
     // Getters and Setters
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -131,20 +103,12 @@ public class Customer {
         this.address = address;
     }
 
-    public List<Order> getOrders() {
-        return orders;
+    public Set<String> getFavoritePizzaIds() {
+        return favoritePizzaIds;
     }
 
-    public void setOrders(List<Order> orders) {
-        this.orders = orders;
-    }
-
-    public Set<Pizza> getFavoritePizzas() {
-        return favoritePizzas;
-    }
-
-    public void setFavoritePizzas(Set<Pizza> favoritePizzas) {
-        this.favoritePizzas = favoritePizzas;
+    public void setFavoritePizzaIds(Set<String> favoritePizzaIds) {
+        this.favoritePizzaIds = favoritePizzaIds;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -182,7 +146,7 @@ public class Customer {
     @Override
     public String toString() {
         return "Customer{" +
-                "id=" + id +
+                "id='" + id + '\'' +
                 ", name='" + name + '\'' +
                 ", email='" + email + '\'' +
                 ", role=" + role +

@@ -11,6 +11,7 @@ import be.vives.pizzastore.exception.ResourceNotFoundException;
 import be.vives.pizzastore.mapper.CustomerMapper;
 import be.vives.pizzastore.mapper.PizzaMapper;
 import be.vives.pizzastore.repository.CustomerRepository;
+import be.vives.pizzastore.repository.OrderRepository;
 import be.vives.pizzastore.repository.PizzaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,29 +19,34 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
-@Transactional
+// No @Transactional (the JPA version has it on the class): Spring Boot configures no transaction manager for
+// MongoDB, and multi-document transactions need a replica set, not the single MongoDB server used here.
+// Each save() of one document is atomic on its own, and a document holds a whole aggregate (a customer with the ids
+// of its favorite pizzas), so most operations touch only one document anyway.
 public class CustomerService {
 
     private static final Logger log = LoggerFactory.getLogger(CustomerService.class);
 
     private final CustomerRepository customerRepository;
     private final PizzaRepository pizzaRepository;
+    private final OrderRepository orderRepository;
     private final CustomerMapper customerMapper;
     private final PizzaMapper pizzaMapper;
     private final PasswordEncoder passwordEncoder;
 
     public CustomerService(CustomerRepository customerRepository,
                            PizzaRepository pizzaRepository,
+                           OrderRepository orderRepository,
                            CustomerMapper customerMapper,
                            PizzaMapper pizzaMapper,
                            PasswordEncoder passwordEncoder) {
         this.customerRepository = customerRepository;
         this.pizzaRepository = pizzaRepository;
+        this.orderRepository = orderRepository;
         this.customerMapper = customerMapper;
         this.pizzaMapper = pizzaMapper;
         this.passwordEncoder = passwordEncoder;
@@ -52,7 +58,7 @@ public class CustomerService {
         return customerPage.map(customerMapper::toResponse);
     }
 
-    public CustomerResponse findById(Long id) {
+    public CustomerResponse findById(String id) {
         log.debug("Finding customer with id: {}", id);
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", id));
@@ -66,11 +72,12 @@ public class CustomerService {
         return customerMapper.toResponse(customer);
     }
 
-    public List<PizzaResponse> findFavoritePizzas(Long customerId) {
+    public List<PizzaResponse> findFavoritePizzas(String customerId) {
         log.debug("Finding favorite pizzas for customer: {}", customerId);
-        Customer customer = customerRepository.findByIdWithFavorites(customerId)
+        Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
-        return customer.getFavoritePizzas().stream()
+        // the customer document only holds the ids: a second query fetches all those pizzas at once
+        return pizzaRepository.findAllById(customer.getFavoritePizzaIds()).stream()
                 .map(pizzaMapper::toResponse)
                 .toList();
     }
@@ -88,7 +95,7 @@ public class CustomerService {
         return customerMapper.toResponse(savedCustomer);
     }
 
-    public CustomerResponse update(Long id, UpdateCustomerRequest request) {
+    public CustomerResponse update(String id, UpdateCustomerRequest request) {
         log.debug("Updating customer with id: {}", id);
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", id));
@@ -99,16 +106,19 @@ public class CustomerService {
         return customerMapper.toResponse(updatedCustomer);
     }
 
-    public void delete(Long id) {
+    public void delete(String id) {
         log.debug("Deleting customer with id: {}", id);
         if (!customerRepository.existsById(id)) {
             throw new ResourceNotFoundException("Customer", id);
         }
+        // the JPA version deletes the orders through cascade = ALL on Customer.orders; MongoDB has no cascades,
+        // so the service deletes the customer's orders itself
+        orderRepository.deleteByCustomerId(id);
         customerRepository.deleteById(id);
         log.info("Deleted customer with id: {}", id);
     }
 
-    public void addFavoritePizza(Long customerId, Long pizzaId) {
+    public void addFavoritePizza(String customerId, String pizzaId) {
         log.debug("Adding pizza {} to customer {} favorites", pizzaId, customerId);
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
@@ -120,7 +130,7 @@ public class CustomerService {
         log.info("Added pizza {} to customer {} favorites", pizzaId, customerId);
     }
 
-    public void removeFavoritePizza(Long customerId, Long pizzaId) {
+    public void removeFavoritePizza(String customerId, String pizzaId) {
         log.debug("Removing pizza {} from customer {} favorites", pizzaId, customerId);
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));

@@ -160,7 +160,7 @@ class RequestValidationTest {
         @Test
         void validRequest_HasNoViolations() {
             CreateOrderRequest request = new CreateOrderRequest(
-                    List.of(new CreateOrderRequest.OrderLineRequest(1L, 2)));
+                    List.of(new CreateOrderRequest.OrderLineRequest("1", 2)));
 
             assertThat(violationsOf(request)).isEmpty();
         }
@@ -174,7 +174,7 @@ class RequestValidationTest {
         @Test
         void quantityZero_IsRejectedInsideTheOrderLine() {
             CreateOrderRequest request = new CreateOrderRequest(
-                    List.of(new CreateOrderRequest.OrderLineRequest(1L, 0)));
+                    List.of(new CreateOrderRequest.OrderLineRequest("1", 0)));
 
             // the property path tells exactly which element of the list is wrong
             assertThat(violationsOf(request)).containsExactly("orderLines[0].quantity: Quantity must be at least 1");
@@ -183,7 +183,7 @@ class RequestValidationTest {
         @Test
         void moreThanTwentyOrderLines_AreRejected() {
             List<CreateOrderRequest.OrderLineRequest> lines = java.util.stream.IntStream.rangeClosed(1, 21)
-                    .mapToObj(i -> new CreateOrderRequest.OrderLineRequest((long) i, 1))
+                    .mapToObj(i -> new CreateOrderRequest.OrderLineRequest(String.valueOf(i), 1))
                     .toList();
 
             assertThat(violationsOf(new CreateOrderRequest(lines)))

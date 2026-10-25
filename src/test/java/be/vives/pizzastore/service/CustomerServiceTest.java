@@ -11,6 +11,7 @@ import be.vives.pizzastore.exception.ResourceNotFoundException;
 import be.vives.pizzastore.mapper.CustomerMapper;
 import be.vives.pizzastore.mapper.PizzaMapper;
 import be.vives.pizzastore.repository.CustomerRepository;
+import be.vives.pizzastore.repository.OrderRepository;
 import be.vives.pizzastore.repository.PizzaRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +44,9 @@ class CustomerServiceTest {
     private PizzaRepository pizzaRepository;
 
     @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
     private CustomerMapper customerMapper;
 
     @Mock
@@ -66,8 +70,8 @@ class CustomerServiceTest {
         Page<Customer> page = new PageImpl<>(Arrays.asList(customer1, customer2));
         Pageable pageable = PageRequest.of(0, 10);
 
-        CustomerResponse response1 = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
-        CustomerResponse response2 = new CustomerResponse(2L, "Jane Smith", "jane@example.com", "0987654321", "456 Oak Ave", "CUSTOMER");
+        CustomerResponse response1 = new CustomerResponse("1", "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+        CustomerResponse response2 = new CustomerResponse("2", "Jane Smith", "jane@example.com", "0987654321", "456 Oak Ave", "CUSTOMER");
 
         when(customerRepository.findAll(pageable)).thenReturn(page);
         when(customerMapper.toResponse(customer1)).thenReturn(response1);
@@ -87,59 +91,63 @@ class CustomerServiceTest {
     void findById_whenExists_shouldReturnCustomer() {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
-        CustomerResponse response = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+        CustomerResponse response = new CustomerResponse("1", "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(customerRepository.findById("1")).thenReturn(Optional.of(customer));
         when(customerMapper.toResponse(customer)).thenReturn(response);
 
         // Act
-        CustomerResponse result = customerService.findById(1L);
+        CustomerResponse result = customerService.findById("1");
 
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.name()).isEqualTo("John Doe");
         assertThat(result.email()).isEqualTo("john@example.com");
-        verify(customerRepository).findById(1L);
+        verify(customerRepository).findById("1");
     }
 
     @Test
     void findById_whenNotExists_shouldThrowException() {
         // Arrange
-        when(customerRepository.findById(999L)).thenReturn(Optional.empty());
+        when(customerRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> customerService.findById(999L))
+        assertThatThrownBy(() -> customerService.findById("999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Customer")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).findById(999L);
+        verify(customerRepository).findById("999");
     }
 
     @Test
     void findFavoritePizzas_shouldReturnListOfPizzas() {
         // Arrange
         Pizza pizza1 = new Pizza("Margherita", BigDecimal.valueOf(8.50), "Classic pizza");
+        pizza1.setId("1");
         Pizza pizza2 = new Pizza("Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza");
+        pizza2.setId("2");
         Customer customer = new Customer("John Doe", "john@example.com");
         customer.addFavoritePizza(pizza1);
         customer.addFavoritePizza(pizza2);
 
-        PizzaResponse pizzaResponse1 = new PizzaResponse(1L, "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
-        PizzaResponse pizzaResponse2 = new PizzaResponse(2L, "Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza", null, true, null);
+        PizzaResponse pizzaResponse1 = new PizzaResponse("1", "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
+        PizzaResponse pizzaResponse2 = new PizzaResponse("2", "Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza", null, true, null);
 
-        when(customerRepository.findByIdWithFavorites(1L)).thenReturn(Optional.of(customer));
+        // the customer document only holds the pizza ids: the service fetches the pizzas in a second query
+        when(customerRepository.findById("1")).thenReturn(Optional.of(customer));
+        when(pizzaRepository.findAllById(customer.getFavoritePizzaIds())).thenReturn(List.of(pizza1, pizza2));
         when(pizzaMapper.toResponse(pizza1)).thenReturn(pizzaResponse1);
         when(pizzaMapper.toResponse(pizza2)).thenReturn(pizzaResponse2);
 
         // Act
-        List<PizzaResponse> result = customerService.findFavoritePizzas(1L);
+        List<PizzaResponse> result = customerService.findFavoritePizzas("1");
 
         // Assert
         assertThat(result).hasSize(2);
         assertThat(result).extracting(PizzaResponse::name)
                 .containsExactlyInAnyOrder("Margherita", "Pepperoni");
-        verify(customerRepository).findByIdWithFavorites(1L);
+        verify(pizzaRepository).findAllById(customer.getFavoritePizzaIds());
     }
 
     @Test
@@ -148,7 +156,7 @@ class CustomerServiceTest {
         CreateCustomerRequest request = new CreateCustomerRequest("John Doe", "john@example.com", "password123", "1234567890", "123 Main St");
         Customer customer = new Customer("John Doe", "john@example.com");
         Customer savedCustomer = new Customer("John Doe", "john@example.com");
-        CustomerResponse response = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+        CustomerResponse response = new CustomerResponse("1", "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
 
         when(customerMapper.toEntity(request)).thenReturn(customer);
         when(passwordEncoder.encode("password123")).thenReturn("{bcrypt}hashed");
@@ -170,11 +178,11 @@ class CustomerServiceTest {
     @Test
     void findByEmail_whenExists_shouldReturnCustomer() {
         Customer customer = new Customer("John Doe", "john@example.com");
-        CustomerResponse response = new CustomerResponse(1L, "John Doe", "john@example.com", null, null, "CUSTOMER");
+        CustomerResponse response = new CustomerResponse("1", "John Doe", "john@example.com", null, null, "CUSTOMER");
         when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
         when(customerMapper.toResponse(customer)).thenReturn(response);
 
-        assertThat(customerService.findByEmail("john@example.com").id()).isEqualTo(1L);
+        assertThat(customerService.findByEmail("john@example.com").id()).isEqualTo("1");
     }
 
     @Test
@@ -206,21 +214,21 @@ class CustomerServiceTest {
         UpdateCustomerRequest request = new UpdateCustomerRequest("John Doe Updated", "john@example.com", "9998887777", "456 New St");
         Customer customer = new Customer("John Doe", "john@example.com");
         Customer updatedCustomer = new Customer("John Doe Updated", "john@example.com");
-        CustomerResponse response = new CustomerResponse(1L, "John Doe Updated", "john@example.com", "9998887777", "456 New St", "CUSTOMER");
+        CustomerResponse response = new CustomerResponse("1", "John Doe Updated", "john@example.com", "9998887777", "456 New St", "CUSTOMER");
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(customerRepository.findById("1")).thenReturn(Optional.of(customer));
         when(customerRepository.save(customer)).thenReturn(updatedCustomer);
         when(customerMapper.toResponse(updatedCustomer)).thenReturn(response);
 
         // Act
-        CustomerResponse result = customerService.update(1L, request);
+        CustomerResponse result = customerService.update("1", request);
 
         // Assert
         assertThat(result).isNotNull();
         assertThat(result.name()).isEqualTo("John Doe Updated");
         assertThat(result.address()).isEqualTo("456 New St");
         assertThat(result.phone()).isEqualTo("9998887777");
-        verify(customerRepository).findById(1L);
+        verify(customerRepository).findById("1");
         verify(customerMapper).updateEntity(request, customer);
         verify(customerRepository).save(customer);
     }
@@ -229,43 +237,45 @@ class CustomerServiceTest {
     void update_whenNotExists_shouldThrowException() {
         // Arrange
         UpdateCustomerRequest request = new UpdateCustomerRequest("John Doe", "john@example.com", "1234567890", "123 Main St");
-        when(customerRepository.findById(999L)).thenReturn(Optional.empty());
+        when(customerRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> customerService.update(999L, request))
+        assertThatThrownBy(() -> customerService.update("999", request))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Customer")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).findById(999L);
+        verify(customerRepository).findById("999");
         verify(customerRepository, never()).save(any());
     }
 
     @Test
     void delete_whenExists_shouldDeleteCustomer() {
         // Arrange
-        when(customerRepository.existsById(1L)).thenReturn(true);
+        when(customerRepository.existsById("1")).thenReturn(true);
 
         // Act
-        customerService.delete(1L);
+        customerService.delete("1");
 
         // Assert
-        verify(customerRepository).existsById(1L);
-        verify(customerRepository).deleteById(1L);
+        verify(customerRepository).existsById("1");
+        // no cascade in MongoDB: the service deletes the customer's orders itself
+        verify(orderRepository).deleteByCustomerId("1");
+        verify(customerRepository).deleteById("1");
     }
 
     @Test
     void delete_whenNotExists_shouldThrowException() {
         // Arrange
-        when(customerRepository.existsById(999L)).thenReturn(false);
+        when(customerRepository.existsById("999")).thenReturn(false);
 
         // Act & Assert
-        assertThatThrownBy(() -> customerService.delete(999L))
+        assertThatThrownBy(() -> customerService.delete("999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Customer")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).existsById(999L);
+        verify(customerRepository).existsById("999");
         verify(customerRepository, never()).deleteById(any());
     }
 
@@ -275,31 +285,31 @@ class CustomerServiceTest {
         Customer customer = new Customer("John Doe", "john@example.com");
         Pizza pizza = new Pizza("Margherita", BigDecimal.valueOf(8.50), "Classic pizza");
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(pizzaRepository.findById(2L)).thenReturn(Optional.of(pizza));
+        when(customerRepository.findById("1")).thenReturn(Optional.of(customer));
+        when(pizzaRepository.findById("2")).thenReturn(Optional.of(pizza));
         when(customerRepository.save(customer)).thenReturn(customer);
 
         // Act
-        customerService.addFavoritePizza(1L, 2L);
+        customerService.addFavoritePizza("1", "2");
 
         // Assert
-        verify(customerRepository).findById(1L);
-        verify(pizzaRepository).findById(2L);
+        verify(customerRepository).findById("1");
+        verify(pizzaRepository).findById("2");
         verify(customerRepository).save(customer);
     }
 
     @Test
     void addFavoritePizza_whenCustomerNotExists_shouldThrowException() {
         // Arrange
-        when(customerRepository.findById(999L)).thenReturn(Optional.empty());
+        when(customerRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> customerService.addFavoritePizza(999L, 1L))
+        assertThatThrownBy(() -> customerService.addFavoritePizza("999", "1"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Customer")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).findById(999L);
+        verify(customerRepository).findById("999");
         verify(pizzaRepository, never()).findById(any());
     }
 
@@ -307,17 +317,17 @@ class CustomerServiceTest {
     void addFavoritePizza_whenPizzaNotExists_shouldThrowException() {
         // Arrange
         Customer customer = new Customer("John Doe", "john@example.com");
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
+        when(customerRepository.findById("1")).thenReturn(Optional.of(customer));
+        when(pizzaRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> customerService.addFavoritePizza(1L, 999L))
+        assertThatThrownBy(() -> customerService.addFavoritePizza("1", "999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Pizza")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).findById(1L);
-        verify(pizzaRepository).findById(999L);
+        verify(customerRepository).findById("1");
+        verify(pizzaRepository).findById("999");
         verify(customerRepository, never()).save(any());
     }
 
@@ -328,31 +338,31 @@ class CustomerServiceTest {
         Customer customer = new Customer("John Doe", "john@example.com");
         customer.addFavoritePizza(pizza);
 
-        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(pizzaRepository.findById(2L)).thenReturn(Optional.of(pizza));
+        when(customerRepository.findById("1")).thenReturn(Optional.of(customer));
+        when(pizzaRepository.findById("2")).thenReturn(Optional.of(pizza));
         when(customerRepository.save(customer)).thenReturn(customer);
 
         // Act
-        customerService.removeFavoritePizza(1L, 2L);
+        customerService.removeFavoritePizza("1", "2");
 
         // Assert
-        verify(customerRepository).findById(1L);
-        verify(pizzaRepository).findById(2L);
+        verify(customerRepository).findById("1");
+        verify(pizzaRepository).findById("2");
         verify(customerRepository).save(customer);
     }
 
     @Test
     void removeFavoritePizza_whenCustomerNotExists_shouldThrowException() {
         // Arrange
-        when(customerRepository.findById(999L)).thenReturn(Optional.empty());
+        when(customerRepository.findById("999")).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> customerService.removeFavoritePizza(999L, 1L))
+        assertThatThrownBy(() -> customerService.removeFavoritePizza("999", "1"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Customer")
                 .hasMessageContaining("999");
 
-        verify(customerRepository).findById(999L);
+        verify(customerRepository).findById("999");
         verify(pizzaRepository, never()).findById(any());
     }
 }

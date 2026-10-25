@@ -63,13 +63,13 @@ class CustomerControllerTest {
     private JwtUtil jwtUtil;
 
     private static CustomerResponse john() {
-        return new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+        return new CustomerResponse("1", "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getAllCustomers_shouldReturnPageOfCustomers() {
-        CustomerResponse jane = new CustomerResponse(2L, "Jane Smith", "jane@example.com", "0987654321", "456 Oak Ave", "CUSTOMER");
+        CustomerResponse jane = new CustomerResponse("2", "Jane Smith", "jane@example.com", "0987654321", "456 Oak Ave", "CUSTOMER");
         when(customerService.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(john(), jane)));
 
         client.get().uri("/api/customers?page=0&size=10")
@@ -87,7 +87,7 @@ class CustomerControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getCustomer_whenExists_shouldReturnCustomer() {
-        when(customerService.findById(1L)).thenReturn(john());
+        when(customerService.findById("1")).thenReturn(john());
 
         client.get().uri("/api/customers/{id}", 1)
                 .exchange()
@@ -99,13 +99,13 @@ class CustomerControllerTest {
                 .jsonPath("$.address").isEqualTo("123 Main St")
                 .jsonPath("$.phone").isEqualTo("1234567890");
 
-        verify(customerService).findById(1L);
+        verify(customerService).findById("1");
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getCustomer_whenNotExists_shouldReturnProblemDetail() {
-        when(customerService.findById(999L)).thenThrow(new ResourceNotFoundException("Customer", 999L));
+        when(customerService.findById("999")).thenThrow(new ResourceNotFoundException("Customer", "999"));
 
         client.get().uri("/api/customers/{id}", 999)
                 .exchange()
@@ -118,7 +118,7 @@ class CustomerControllerTest {
                 .jsonPath("$.type").isEqualTo("https://api.pizzastore.example.com/errors/not-found")
                 .jsonPath("$.instance").isEqualTo("/api/customers/999");
 
-        verify(customerService).findById(999L);
+        verify(customerService).findById("999");
     }
 
     @Test
@@ -148,7 +148,7 @@ class CustomerControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getCustomer_whenUnexpectedErrorOccurs_shouldReturnProblemDetail() {
-        when(customerService.findById(1L)).thenThrow(new IllegalStateException("boom"));
+        when(customerService.findById("1")).thenThrow(new IllegalStateException("boom"));
 
         client.get().uri("/api/customers/{id}", 1)
                 .exchange()
@@ -159,18 +159,18 @@ class CustomerControllerTest {
                 .jsonPath("$.title").isEqualTo("Internal Server Error")
                 .jsonPath("$.type").isEqualTo("https://api.pizzastore.example.com/errors/internal-error");
 
-        verify(customerService).findById(1L);
+        verify(customerService).findById("1");
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getCustomerOrders_shouldReturnPageOfOrders() {
-        OrderResponse order1 = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe",
+        OrderResponse order1 = new OrderResponse("1", "ORD-2024-000001", "1", "John Doe",
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
-        OrderResponse order2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe",
+        OrderResponse order2 = new OrderResponse("2", "ORD-2024-000002", "1", "John Doe",
                 List.of(), BigDecimal.valueOf(30.00), OrderStatus.DELIVERED, LocalDateTime.now());
         Page<OrderResponse> page = new PageImpl<>(List.of(order1, order2));
-        when(orderService.findByCustomerId(eq(1L), any(Pageable.class))).thenReturn(page);
+        when(orderService.findByCustomerId(eq("1"), any(Pageable.class))).thenReturn(page);
 
         client.get().uri("/api/customers/{id}/orders?page=0&size=10", 1)
                 .exchange()
@@ -180,15 +180,15 @@ class CustomerControllerTest {
                 .jsonPath("$.content[0].orderNumber").isEqualTo("ORD-2024-000001")
                 .jsonPath("$.content[1].orderNumber").isEqualTo("ORD-2024-000002");
 
-        verify(orderService).findByCustomerId(eq(1L), any(Pageable.class));
+        verify(orderService).findByCustomerId(eq("1"), any(Pageable.class));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getFavoritePizzas_shouldReturnListOfPizzas() {
-        PizzaResponse pizza1 = new PizzaResponse(1L, "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
-        PizzaResponse pizza2 = new PizzaResponse(2L, "Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza", null, true, null);
-        when(customerService.findFavoritePizzas(1L)).thenReturn(List.of(pizza1, pizza2));
+        PizzaResponse pizza1 = new PizzaResponse("1", "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
+        PizzaResponse pizza2 = new PizzaResponse("2", "Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza", null, true, null);
+        when(customerService.findFavoritePizzas("1")).thenReturn(List.of(pizza1, pizza2));
 
         client.get().uri("/api/customers/{id}/favorites", 1)
                 .exchange()
@@ -200,7 +200,7 @@ class CustomerControllerTest {
                 .jsonPath("$[1].name").isEqualTo("Pepperoni")
                 .jsonPath("$[1].price").isEqualTo(10.00);
 
-        verify(customerService).findFavoritePizzas(1L);
+        verify(customerService).findFavoritePizzas("1");
     }
 
     @Test
@@ -229,8 +229,8 @@ class CustomerControllerTest {
     void updateCustomer_shouldReturnUpdatedCustomer() {
         UpdateCustomerRequest request = new UpdateCustomerRequest(
                 "John Doe Updated", "john@example.com", "9998887777", "456 New St");
-        CustomerResponse response = new CustomerResponse(1L, "John Doe Updated", "john@example.com", "9998887777", "456 New St", "CUSTOMER");
-        when(customerService.update(eq(1L), any(UpdateCustomerRequest.class))).thenReturn(response);
+        CustomerResponse response = new CustomerResponse("1", "John Doe Updated", "john@example.com", "9998887777", "456 New St", "CUSTOMER");
+        when(customerService.update(eq("1"), any(UpdateCustomerRequest.class))).thenReturn(response);
 
         client.put().uri("/api/customers/{id}", 1)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -243,43 +243,43 @@ class CustomerControllerTest {
                 .jsonPath("$.address").isEqualTo("456 New St")
                 .jsonPath("$.phone").isEqualTo("9998887777");
 
-        verify(customerService).update(eq(1L), any(UpdateCustomerRequest.class));
+        verify(customerService).update(eq("1"), any(UpdateCustomerRequest.class));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void deleteCustomer_shouldReturnNoContent() {
-        doNothing().when(customerService).delete(1L);
+        doNothing().when(customerService).delete("1");
 
         client.delete().uri("/api/customers/{id}", 1)
                 .exchange()
                 .expectStatus().isNoContent();
 
-        verify(customerService).delete(1L);
+        verify(customerService).delete("1");
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void addFavoritePizza_shouldReturnOk() {
-        doNothing().when(customerService).addFavoritePizza(1L, 2L);
+        doNothing().when(customerService).addFavoritePizza("1", "2");
 
         client.post().uri("/api/customers/{customerId}/favorites/{pizzaId}", 1, 2)
                 .exchange()
                 .expectStatus().isOk();
 
-        verify(customerService).addFavoritePizza(1L, 2L);
+        verify(customerService).addFavoritePizza("1", "2");
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void removeFavoritePizza_shouldReturnNoContent() {
-        doNothing().when(customerService).removeFavoritePizza(1L, 2L);
+        doNothing().when(customerService).removeFavoritePizza("1", "2");
 
         client.delete().uri("/api/customers/{customerId}/favorites/{pizzaId}", 1, 2)
                 .exchange()
                 .expectStatus().isNoContent();
 
-        verify(customerService).removeFavoritePizza(1L, 2L);
+        verify(customerService).removeFavoritePizza("1", "2");
     }
 
     // ---------- URL rules: outside /me, a customer cannot use /api/customers at all ----------

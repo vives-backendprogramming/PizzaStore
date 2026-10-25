@@ -28,12 +28,12 @@ class PizzaMapperTest {
     @Test
     void toResponse_MapsEntityIncludingNutritionalInfo() {
         Pizza pizza = new Pizza("Margherita", new BigDecimal("8.50"), "Classic");
-        pizza.setId(1L);
+        pizza.setId("1");
         pizza.setNutritionalInfo(new NutritionalInfo(266, new BigDecimal("11.0"), new BigDecimal("33.0"), new BigDecimal("10.0")));
 
         PizzaResponse response = pizzaMapper.toResponse(pizza);
 
-        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.id()).isEqualTo("1");
         assertThat(response.name()).isEqualTo("Margherita");
         assertThat(response.price()).isEqualByComparingTo("8.50");
         assertThat(response.nutritionalInfo().calories()).isEqualTo(266);
@@ -55,12 +55,12 @@ class PizzaMapperTest {
     @Test
     void updateEntity_OverwritesFieldsButKeepsId() {
         Pizza existing = new Pizza("Old name", new BigDecimal("5.00"), "Old");
-        existing.setId(7L);
+        existing.setId("7");
         UpdatePizzaRequest update = new UpdatePizzaRequest("New name", new BigDecimal("6.00"), "New", false, null);
 
         pizzaMapper.updateEntity(update, existing);
 
-        assertThat(existing.getId()).isEqualTo(7L);
+        assertThat(existing.getId()).isEqualTo("7");
         assertThat(existing.getName()).isEqualTo("New name");
         assertThat(existing.getPrice()).isEqualByComparingTo("6.00");
         assertThat(existing.getAvailable()).isFalse();

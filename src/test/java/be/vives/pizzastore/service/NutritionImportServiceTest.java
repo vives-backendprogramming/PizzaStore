@@ -56,16 +56,16 @@ class NutritionImportServiceTest {
 
     @Test
     void importFromBarcode_CompleteProduct_StoresRoundedValues() {
-        PizzaResponse expected = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), "Classic", null, true, null);
+        PizzaResponse expected = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), "Classic", null, true, null);
         when(openFoodFactsClient.getProduct(BARCODE)).thenReturn(
                 found(new BigDecimal("538.6"), new BigDecimal("6.305"), new BigDecimal("57.5"), new BigDecimal("30.9")));
         when(pizzaService.updateNutritionalInfo(any(), any())).thenReturn(expected);
 
-        PizzaResponse result = service.importFromBarcode(1L, BARCODE);
+        PizzaResponse result = service.importFromBarcode("1", BARCODE);
 
         assertThat(result).isSameAs(expected);
         ArgumentCaptor<NutritionalInfoRequest> captor = ArgumentCaptor.forClass(NutritionalInfoRequest.class);
-        verify(pizzaService).updateNutritionalInfo(org.mockito.ArgumentMatchers.eq(1L), captor.capture());
+        verify(pizzaService).updateNutritionalInfo(org.mockito.ArgumentMatchers.eq("1"), captor.capture());
         assertThat(captor.getValue().calories()).isEqualTo(539);                    // 538.6 -> Integer column
         assertThat(captor.getValue().protein()).isEqualByComparingTo("6.31");       // 2 decimals, half up
         assertThat(captor.getValue().carbohydrates()).isEqualByComparingTo("57.50");
@@ -74,9 +74,9 @@ class NutritionImportServiceTest {
 
     @Test
     void importFromBarcode_UnknownPizza_NeverCallsOpenFoodFacts() {
-        when(pizzaService.findById(999L)).thenThrow(new ResourceNotFoundException("Pizza", 999L));
+        when(pizzaService.findById("999")).thenThrow(new ResourceNotFoundException("Pizza", "999"));
 
-        assertThatThrownBy(() -> service.importFromBarcode(999L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("999", BARCODE))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(openFoodFactsClient);   // do not waste a request of the 15/minute quota
@@ -87,7 +87,7 @@ class NutritionImportServiceTest {
         when(openFoodFactsClient.getProduct(BARCODE)).thenThrow(
                 HttpClientErrorException.create(HttpStatus.NOT_FOUND, "Not Found", null, null, null));
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Open Food Facts does not know a product with barcode " + BARCODE);
         verify(pizzaService, never()).updateNutritionalInfo(any(), any());
@@ -97,7 +97,7 @@ class NutritionImportServiceTest {
     void importFromBarcode_Status0With200_BecomesBusinessException() {
         when(openFoodFactsClient.getProduct(BARCODE)).thenReturn(new OpenFoodFactsResponse(BARCODE, 0, null));
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("does not know a product");
     }
@@ -107,7 +107,7 @@ class NutritionImportServiceTest {
         when(openFoodFactsClient.getProduct(BARCODE)).thenReturn(
                 found(new BigDecimal("539"), new BigDecimal("6.3"), null, new BigDecimal("30.9")));   // no carbohydrates
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("no complete nutritional data");
         verify(pizzaService, never()).updateNutritionalInfo(any(), any());
@@ -118,7 +118,7 @@ class NutritionImportServiceTest {
         when(openFoodFactsClient.getProduct(BARCODE)).thenReturn(
                 new OpenFoodFactsResponse(BARCODE, 1, new Product("Mystery", null)));
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -127,7 +127,7 @@ class NutritionImportServiceTest {
         when(openFoodFactsClient.getProduct(BARCODE)).thenThrow(
                 HttpServerErrorException.create(HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", null, null, null));
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(ExternalServiceException.class)
                 .hasMessage("Open Food Facts is currently unavailable, please try again later")
                 .hasCauseInstanceOf(HttpServerErrorException.class);
@@ -138,7 +138,7 @@ class NutritionImportServiceTest {
         when(openFoodFactsClient.getProduct(BARCODE)).thenThrow(
                 HttpClientErrorException.create(HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", null, null, null));
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(ExternalServiceException.class);
     }
 
@@ -147,7 +147,7 @@ class NutritionImportServiceTest {
         when(openFoodFactsClient.getProduct(BARCODE)).thenThrow(
                 new ResourceAccessException("I/O error: Read timed out"));
 
-        assertThatThrownBy(() -> service.importFromBarcode(1L, BARCODE))
+        assertThatThrownBy(() -> service.importFromBarcode("1", BARCODE))
                 .isInstanceOf(ExternalServiceException.class)
                 .hasCauseInstanceOf(ResourceAccessException.class);
     }

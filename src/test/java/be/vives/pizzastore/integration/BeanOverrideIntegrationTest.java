@@ -1,5 +1,6 @@
 package be.vives.pizzastore.integration;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
 import be.vives.pizzastore.dto.request.CreatePizzaRequest;
 import be.vives.pizzastore.dto.response.PizzaResponse;
 import be.vives.pizzastore.service.FileStorageService;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -37,8 +39,8 @@ import static org.mockito.Mockito.when;
  * Both live in {@code org.springframework.test.context.bean.override.mockito} (Spring Framework 7) and replace
  * the deprecated {@code @MockBean} / {@code @SpyBean}.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.datasource.url=jdbc:h2:mem:bean-override-test")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(MongoTestcontainersConfiguration.class)
 @AutoConfigureRestTestClient
 class BeanOverrideIntegrationTest {
 

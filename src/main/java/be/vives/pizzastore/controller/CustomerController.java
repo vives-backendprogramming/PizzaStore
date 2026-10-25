@@ -90,7 +90,7 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer not found")
     })
     public ResponseEntity<CustomerResponse> getCustomer(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Customer ID", required = true) @PathVariable String id) {
         log.debug("GET /api/customers/{}", id);
         CustomerResponse customer = customerService.findById(id);
         return ResponseEntity.ok(customer);
@@ -112,7 +112,7 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer not found")
     })
     public ResponseEntity<Page<OrderResponse>> getCustomerOrders(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long id,
+            @Parameter(description = "Customer ID", required = true) @PathVariable String id,
             @Parameter(description = "Page number (0-indexed)") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size) {
 
@@ -137,7 +137,7 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer not found")
     })
     public ResponseEntity<List<PizzaResponse>> getFavoritePizzas(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Customer ID", required = true) @PathVariable String id) {
         log.debug("GET /api/customers/{}/favorites", id);
         List<PizzaResponse> favorites = customerService.findFavoritePizzas(id);
         return ResponseEntity.ok(favorites);
@@ -190,7 +190,7 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer not found")
     })
     public ResponseEntity<CustomerResponse> updateCustomer(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long id,
+            @Parameter(description = "Customer ID", required = true) @PathVariable String id,
             @Valid @RequestBody UpdateCustomerRequest request) {
 
         log.debug("PUT /api/customers/{} - {}", id, request);
@@ -211,7 +211,7 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer not found")
     })
     public ResponseEntity<Void> deleteCustomer(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Customer ID", required = true) @PathVariable String id) {
         log.debug("DELETE /api/customers/{}", id);
 
         customerService.delete(id);
@@ -230,8 +230,8 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer or pizza not found")
     })
     public ResponseEntity<Void> addFavoritePizza(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long customerId,
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long pizzaId) {
+            @Parameter(description = "Customer ID", required = true) @PathVariable String customerId,
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String pizzaId) {
 
         log.debug("POST /api/customers/{}/favorites/{}", customerId, pizzaId);
 
@@ -251,8 +251,8 @@ public class CustomerController {
             @ApiResponse(responseCode = "404", description = "Customer or pizza not found")
     })
     public ResponseEntity<Void> removeFavoritePizza(
-            @Parameter(description = "Customer ID", required = true) @PathVariable Long customerId,
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long pizzaId) {
+            @Parameter(description = "Customer ID", required = true) @PathVariable String customerId,
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String pizzaId) {
 
         log.debug("DELETE /api/customers/{}/favorites/{}", customerId, pizzaId);
 

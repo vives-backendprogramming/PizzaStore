@@ -1,34 +1,21 @@
 package be.vives.pizzastore.domain;
 
-import jakarta.persistence.*;
-
 import java.math.BigDecimal;
 
-@Entity
-@Table(name = "order_lines")
+// Embedded value object: no @Document and no id, it lives inside its Order document. In the JPA version it
+// was its own table with @ManyToOne references to Order and Pizza. Here it references the pizza by id and
+// copies its name and price: an order line records what was ordered at that moment, even if the pizza is
+// renamed or gets a new price later (the price was already copied in the JPA version, for the same reason).
 public class OrderLine {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String pizzaId;
 
-    // @ManyToOne: Many OrderLines belong to one Order
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_id", nullable = false)
-    private Order order;
+    private String pizzaName;
 
-    // @ManyToOne: Many OrderLines reference one Pizza
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pizza_id", nullable = false)
-    private Pizza pizza;
-
-    @Column(nullable = false)
     private Integer quantity;
 
-    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
     // Constructors
@@ -36,39 +23,28 @@ public class OrderLine {
     }
 
     public OrderLine(Pizza pizza, Integer quantity) {
-        this.pizza = pizza;
+        this.pizzaId = pizza.getId();
+        this.pizzaName = pizza.getName();
         this.quantity = quantity;
         this.unitPrice = pizza.getPrice();
         this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
     }
 
     // Getters and Setters
-    public Long getId() {
-        return id;
+    public String getPizzaId() {
+        return pizzaId;
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setPizzaId(String pizzaId) {
+        this.pizzaId = pizzaId;
     }
 
-    public Order getOrder() {
-        return order;
+    public String getPizzaName() {
+        return pizzaName;
     }
 
-    public void setOrder(Order order) {
-        this.order = order;
-    }
-
-    public Pizza getPizza() {
-        return pizza;
-    }
-
-    public void setPizza(Pizza pizza) {
-        this.pizza = pizza;
-        if (pizza != null) {
-            this.unitPrice = pizza.getPrice();
-            calculateSubtotal();
-        }
+    public void setPizzaName(String pizzaName) {
+        this.pizzaName = pizzaName;
     }
 
     public Integer getQuantity() {
@@ -106,7 +82,8 @@ public class OrderLine {
     @Override
     public String toString() {
         return "OrderLine{" +
-                "id=" + id +
+                "pizzaId='" + pizzaId + '\'' +
+                ", pizzaName='" + pizzaName + '\'' +
                 ", quantity=" + quantity +
                 ", unitPrice=" + unitPrice +
                 ", subtotal=" + subtotal +

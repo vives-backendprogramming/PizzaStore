@@ -8,6 +8,8 @@ import be.vives.pizzastore.dto.request.UpdatePizzaRequest;
 import be.vives.pizzastore.dto.response.PizzaResponse;
 import be.vives.pizzastore.exception.ResourceNotFoundException;
 import be.vives.pizzastore.mapper.PizzaMapper;
+import be.vives.pizzastore.repository.CustomerRepository;
+import be.vives.pizzastore.repository.OrderRepository;
 import be.vives.pizzastore.repository.PizzaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -53,6 +56,12 @@ class PizzaServiceTest {
     @Mock
     private FileStorageService fileStorageService;
 
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private CustomerRepository customerRepository;
+
     @InjectMocks  // Injects the mocks above
     private PizzaService pizzaService;
 
@@ -63,9 +72,9 @@ class PizzaServiceTest {
     @BeforeEach
     void setup() {
         testPizza = new Pizza("Margherita", new BigDecimal("8.50"), "Classic tomato and mozzarella");
-        testPizza.setId(1L);
+        testPizza.setId("1");
 
-        testResponse = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), 
+        testResponse = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), 
                 "Classic tomato and mozzarella", null, true, null);
 
         createRequest = new CreatePizzaRequest("Margherita", new BigDecimal("8.50"), 
@@ -75,32 +84,32 @@ class PizzaServiceTest {
     @Test
     void findById_ExistingPizza_ReturnsPizzaResponse() {
         // Given
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(testPizza));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(testPizza));
         when(pizzaMapper.toResponse(testPizza)).thenReturn(testResponse);
 
         // When
-        PizzaResponse result = pizzaService.findById(1L);
+        PizzaResponse result = pizzaService.findById("1");
 
         // Then
-        assertThat(result.id()).isEqualTo(1L);
+        assertThat(result.id()).isEqualTo("1");
         assertThat(result.name()).isEqualTo("Margherita");
         assertThat(result.price()).isEqualByComparingTo(new BigDecimal("8.50"));
 
-        verify(pizzaRepository).findById(1L);
+        verify(pizzaRepository).findById("1");
         verify(pizzaMapper).toResponse(testPizza);
     }
 
     @Test
     void findById_NonExistingPizza_ThrowsResourceNotFoundException() {
         // Given
-        when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
+        when(pizzaRepository.findById("999")).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> pizzaService.findById(999L))
+        assertThatThrownBy(() -> pizzaService.findById("999"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Pizza with id 999 not found");
 
-        verify(pizzaRepository).findById(999L);
+        verify(pizzaRepository).findById("999");
         verify(pizzaMapper, never()).toResponse(any());
     }
 
@@ -108,12 +117,12 @@ class PizzaServiceTest {
     void findByPriceLessThan_MultiplePizzas_ReturnsListOfResponses() {
         // Given
         Pizza pizza2 = new Pizza("Marinara", new BigDecimal("7.50"), "Simple");
-        pizza2.setId(2L);
+        pizza2.setId("2");
 
         List<Pizza> pizzas = Arrays.asList(testPizza, pizza2);
         List<PizzaResponse> responses = Arrays.asList(
                 testResponse,
-                new PizzaResponse(2L, "Marinara", new BigDecimal("7.50"), "Simple", null, true, null)
+                new PizzaResponse("2", "Marinara", new BigDecimal("7.50"), "Simple", null, true, null)
         );
 
         when(pizzaRepository.findByPriceLessThan(new BigDecimal("10.00"))).thenReturn(pizzas);
@@ -161,17 +170,17 @@ class PizzaServiceTest {
                 null
         );
 
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(testPizza));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(testPizza));
         when(pizzaRepository.save(testPizza)).thenReturn(testPizza);
         when(pizzaMapper.toResponse(testPizza)).thenReturn(testResponse);
 
         // When
-        PizzaResponse result = pizzaService.update(1L, updateRequest);
+        PizzaResponse result = pizzaService.update("1", updateRequest);
 
         // Then
         assertThat(result).isNotNull();
 
-        verify(pizzaRepository).findById(1L);
+        verify(pizzaRepository).findById("1");
         verify(pizzaMapper).updateEntity(updateRequest, testPizza);
         verify(pizzaRepository).save(testPizza);
         verify(pizzaMapper).toResponse(testPizza);
@@ -187,39 +196,64 @@ class PizzaServiceTest {
                 true,
                 null
         );
-        when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
+        when(pizzaRepository.findById("999")).thenReturn(Optional.empty());
 
         // When
         // When & Then
-        assertThatThrownBy(() -> pizzaService.update(999L, updateRequest))
+        assertThatThrownBy(() -> pizzaService.update("999", updateRequest))
                 .isInstanceOf(ResourceNotFoundException.class);
-        verify(pizzaRepository).findById(999L);
+        verify(pizzaRepository).findById("999");
         verify(pizzaRepository, never()).save(any());
     }
 
     @Test
     void delete_ExistingPizza_DeletesPizza() {
         // Given
-        when(pizzaRepository.existsById(1L)).thenReturn(true);
+        when(pizzaRepository.existsById("1")).thenReturn(true);
 
         // When
-        pizzaService.delete(1L);
+        pizzaService.delete("1");
 
         // Then
-        verify(pizzaRepository).existsById(1L);
-        verify(pizzaRepository).deleteById(1L);
+        verify(pizzaRepository).existsById("1");
+        verify(pizzaRepository).deleteById("1");
     }
 
     @Test
     void delete_NonExistingPizza_ThrowsResourceNotFoundException() {
         // Given
-        when(pizzaRepository.existsById(999L)).thenReturn(false);
+        when(pizzaRepository.existsById("999")).thenReturn(false);
 
         // When & Then
-        assertThatThrownBy(() -> pizzaService.delete(999L))
+        assertThatThrownBy(() -> pizzaService.delete("999"))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(pizzaRepository).existsById(999L);
+        verify(pizzaRepository).existsById("999");
+        verify(pizzaRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void delete_PizzaInAnOrder_ThrowsDataIntegrityViolation() {
+        // Given: MongoDB has no foreign key to refuse this, so the service checks it (409 Conflict, like with JPA)
+        when(pizzaRepository.existsById("1")).thenReturn(true);
+        when(orderRepository.existsByOrderLinesPizzaId("1")).thenReturn(true);
+
+        // When & Then
+        assertThatThrownBy(() -> pizzaService.delete("1"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        verify(pizzaRepository, never()).deleteById(any());
+    }
+
+    @Test
+    void delete_FavoritePizza_ThrowsDataIntegrityViolation() {
+        // Given
+        when(pizzaRepository.existsById("1")).thenReturn(true);
+        when(orderRepository.existsByOrderLinesPizzaId("1")).thenReturn(false);
+        when(customerRepository.existsByFavoritePizzaIds("1")).thenReturn(true);
+
+        // When & Then
+        assertThatThrownBy(() -> pizzaService.delete("1"))
+                .isInstanceOf(DataIntegrityViolationException.class);
         verify(pizzaRepository, never()).deleteById(any());
     }
 
@@ -270,12 +304,12 @@ class PizzaServiceTest {
     void findByPriceBetween_MultipleResults_ReturnsListOfResponses() {
         // Given
         Pizza pizza2 = new Pizza("Marinara", new BigDecimal("7.50"), "Simple");
-        pizza2.setId(2L);
+        pizza2.setId("2");
 
         List<Pizza> pizzas = Arrays.asList(testPizza, pizza2);
         List<PizzaResponse> responses = Arrays.asList(
                 testResponse,
-                new PizzaResponse(2L, "Marinara", new BigDecimal("7.50"), "Simple", null, true, null)
+                new PizzaResponse("2", "Marinara", new BigDecimal("7.50"), "Simple", null, true, null)
         );
 
         when(pizzaRepository.findByPriceBetween(new BigDecimal("7.00"), new BigDecimal("9.00")))
@@ -314,12 +348,12 @@ class PizzaServiceTest {
     void findByNameContaining_MultipleResults_ReturnsListOfResponses() {
         // Given
         Pizza pizza2 = new Pizza("Marinara", new BigDecimal("7.50"), "Simple");
-        pizza2.setId(2L);
+        pizza2.setId("2");
 
         List<Pizza> pizzas = Arrays.asList(testPizza, pizza2);
         List<PizzaResponse> responses = Arrays.asList(
                 testResponse,
-                new PizzaResponse(2L, "Marinara", new BigDecimal("7.50"), "Simple", null, true, null)
+                new PizzaResponse("2", "Marinara", new BigDecimal("7.50"), "Simple", null, true, null)
         );
 
         when(pizzaRepository.findByNameContainingIgnoreCase("mar")).thenReturn(pizzas);
@@ -358,22 +392,22 @@ class PizzaServiceTest {
         MultipartFile mockFile = mock(MultipartFile.class);
         String imageUrl = "/uploads/pizza-1.jpg";
         
-        PizzaResponse updatedResponse = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), 
+        PizzaResponse updatedResponse = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), 
                 "Classic tomato and mozzarella", imageUrl, true, null);
 
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(testPizza));
-        when(fileStorageService.storeFile(mockFile, 1L)).thenReturn(imageUrl);
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(testPizza));
+        when(fileStorageService.storeFile(mockFile, "1")).thenReturn(imageUrl);
         when(pizzaRepository.save(testPizza)).thenReturn(testPizza);
         when(pizzaMapper.toResponse(testPizza)).thenReturn(updatedResponse);
 
         // When
-        PizzaResponse result = pizzaService.uploadImage(1L, mockFile);
+        PizzaResponse result = pizzaService.uploadImage("1", mockFile);
 
         // Then
         assertThat(result.imageUrl()).isEqualTo(imageUrl);
 
-        verify(pizzaRepository).findById(1L);
-        verify(fileStorageService).storeFile(mockFile, 1L);
+        verify(pizzaRepository).findById("1");
+        verify(fileStorageService).storeFile(mockFile, "1");
         verify(pizzaRepository).save(testPizza);
         verify(pizzaMapper).toResponse(testPizza);
     }
@@ -382,19 +416,19 @@ class PizzaServiceTest {
     void uploadImage_NonExistingPizza_ThrowsResourceNotFoundException() {
         // Given
         MultipartFile mockFile = mock(MultipartFile.class);
-        when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
+        when(pizzaRepository.findById("999")).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> pizzaService.uploadImage(999L, mockFile))
+        assertThatThrownBy(() -> pizzaService.uploadImage("999", mockFile))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(pizzaRepository).findById(999L);
+        verify(pizzaRepository).findById("999");
         verify(fileStorageService, never()).storeFile(any(), any());
         verify(pizzaRepository, never()).save(any());
     }
 
     @Test
-    void create_WithNutritionalInfo_SetsBidirectionalRelationship() {
+    void create_WithNutritionalInfo_SavesItWithThePizza() {
         // Given
         CreatePizzaRequest request = new CreatePizzaRequest(
                 "Margherita", 
@@ -415,17 +449,17 @@ class PizzaServiceTest {
         // When
         PizzaResponse result = pizzaService.create(request);
 
-        // Then
+        // Then: embedded in the pizza document, so saving the pizza saves it too (no bidirectional link to set)
         assertThat(result).isNotNull();
-        assertThat(nutritionalInfo.getPizza()).isEqualTo(pizzaWithNutritionalInfo);
-        
+        assertThat(pizzaWithNutritionalInfo.getNutritionalInfo()).isSameAs(nutritionalInfo);
+
         verify(pizzaMapper).toEntity(request);
         verify(pizzaRepository).save(pizzaWithNutritionalInfo);
         verify(pizzaMapper).toResponse(pizzaWithNutritionalInfo);
     }
 
     @Test
-    void update_WithNutritionalInfo_SetsBidirectionalRelationship() {
+    void update_WithNutritionalInfo_SavesItWithThePizza() {
         // Given
         UpdatePizzaRequest updateRequest = new UpdatePizzaRequest(
                 "Margherita Special",
@@ -436,38 +470,37 @@ class PizzaServiceTest {
         );
 
         Pizza pizzaWithNutritionalInfo = new Pizza("Margherita", new BigDecimal("8.50"), "Classic");
-        pizzaWithNutritionalInfo.setId(1L);
+        pizzaWithNutritionalInfo.setId("1");
         be.vives.pizzastore.domain.NutritionalInfo nutritionalInfo = new be.vives.pizzastore.domain.NutritionalInfo();
         pizzaWithNutritionalInfo.setNutritionalInfo(nutritionalInfo);
 
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(pizzaWithNutritionalInfo));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(pizzaWithNutritionalInfo));
         when(pizzaRepository.save(pizzaWithNutritionalInfo)).thenReturn(pizzaWithNutritionalInfo);
         when(pizzaMapper.toResponse(pizzaWithNutritionalInfo)).thenReturn(testResponse);
 
         // When
-        PizzaResponse result = pizzaService.update(1L, updateRequest);
+        PizzaResponse result = pizzaService.update("1", updateRequest);
 
         // Then
         assertThat(result).isNotNull();
-        assertThat(nutritionalInfo.getPizza()).isEqualTo(pizzaWithNutritionalInfo);
+        assertThat(pizzaWithNutritionalInfo.getNutritionalInfo()).isSameAs(nutritionalInfo);
 
-        verify(pizzaRepository).findById(1L);
+        verify(pizzaRepository).findById("1");
         verify(pizzaMapper).updateEntity(updateRequest, pizzaWithNutritionalInfo);
         verify(pizzaRepository).save(pizzaWithNutritionalInfo);
     }
 
     @Test
-    void updateNutritionalInfo_PizzaWithoutInfo_CreatesItAndLinksBothSides() {
+    void updateNutritionalInfo_PizzaWithoutInfo_CreatesIt() {
         NutritionalInfoRequest request = new NutritionalInfoRequest(539, new BigDecimal("6.30"), new BigDecimal("57.50"), new BigDecimal("30.90"));
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(testPizza));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(testPizza));
         when(pizzaRepository.save(testPizza)).thenReturn(testPizza);
         when(pizzaMapper.toResponse(testPizza)).thenReturn(testResponse);
 
-        pizzaService.updateNutritionalInfo(1L, request);
+        pizzaService.updateNutritionalInfo("1", request);
 
         NutritionalInfo info = testPizza.getNutritionalInfo();
         assertThat(info).isNotNull();
-        assertThat(info.getPizza()).isSameAs(testPizza);   // the owning side (pizza_id) must be set
         assertThat(info.getCalories()).isEqualTo(539);
         assertThat(info.getProtein()).isEqualByComparingTo("6.30");
         assertThat(info.getCarbohydrates()).isEqualByComparingTo("57.50");
@@ -475,26 +508,25 @@ class PizzaServiceTest {
     }
 
     @Test
-    void updateNutritionalInfo_PizzaWithInfo_OverwritesTheExistingRow() {
+    void updateNutritionalInfo_PizzaWithInfo_OverwritesTheExistingInfo() {
         NutritionalInfo existing = new NutritionalInfo(100, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE);
-        existing.setPizza(testPizza);
         testPizza.setNutritionalInfo(existing);
         NutritionalInfoRequest request = new NutritionalInfoRequest(539, new BigDecimal("6.30"), new BigDecimal("57.50"), new BigDecimal("30.90"));
-        when(pizzaRepository.findById(1L)).thenReturn(Optional.of(testPizza));
+        when(pizzaRepository.findById("1")).thenReturn(Optional.of(testPizza));
         when(pizzaRepository.save(testPizza)).thenReturn(testPizza);
         when(pizzaMapper.toResponse(testPizza)).thenReturn(testResponse);
 
-        pizzaService.updateNutritionalInfo(1L, request);
+        pizzaService.updateNutritionalInfo("1", request);
 
-        assertThat(testPizza.getNutritionalInfo()).isSameAs(existing);   // updated in place: no orphan row, no second row
+        assertThat(testPizza.getNutritionalInfo()).isSameAs(existing);   // updated in place
         assertThat(existing.getCalories()).isEqualTo(539);
     }
 
     @Test
     void updateNutritionalInfo_NonExistingPizza_ThrowsResourceNotFoundException() {
-        when(pizzaRepository.findById(999L)).thenReturn(Optional.empty());
+        when(pizzaRepository.findById("999")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> pizzaService.updateNutritionalInfo(999L, new NutritionalInfoRequest(1, null, null, null)))
+        assertThatThrownBy(() -> pizzaService.updateNutritionalInfo("999", new NutritionalInfoRequest(1, null, null, null)))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(pizzaRepository, never()).save(any());
     }

@@ -69,7 +69,7 @@ class PizzaControllerTest {
     private JwtUtil jwtUtil;
 
     private static PizzaResponse pizza(long id, String name, String price, String description) {
-        return new PizzaResponse(id, name, new BigDecimal(price), description, null, true, null);
+        return new PizzaResponse(String.valueOf(id), name, new BigDecimal(price), description, null, true, null);
     }
 
     private static CreatePizzaRequest newPizzaRequest() {
@@ -121,25 +121,25 @@ class PizzaControllerTest {
 
     @Test
     void getPizza_ExistingId_ReturnsPizza() {
-        when(pizzaService.findById(1L)).thenReturn(pizza(1, "Margherita", "8.50", "Classic"));
+        when(pizzaService.findById("1")).thenReturn(pizza(1, "Margherita", "8.50", "Classic"));
 
         client.get().uri("/api/pizzas/{id}", 1)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(PizzaResponse.class)
                 .value(result -> {
-                    assertThat(result.id()).isEqualTo(1L);
+                    assertThat(result.id()).isEqualTo("1");
                     assertThat(result.name()).isEqualTo("Margherita");
                     assertThat(result.price()).isEqualByComparingTo("8.50");
                     assertThat(result.description()).isEqualTo("Classic");
                 });
 
-        verify(pizzaService).findById(1L);
+        verify(pizzaService).findById("1");
     }
 
     @Test
     void getPizza_NonExistingId_Returns404() {
-        when(pizzaService.findById(999L)).thenThrow(new ResourceNotFoundException("Pizza", 999L));
+        when(pizzaService.findById("999")).thenThrow(new ResourceNotFoundException("Pizza", "999"));
 
         client.get().uri("/api/pizzas/{id}", 999)
                 .exchange()
@@ -150,7 +150,7 @@ class PizzaControllerTest {
                 .jsonPath("$.detail").isEqualTo("Pizza with id 999 not found")
                 .jsonPath("$.instance").isEqualTo("/api/pizzas/999");
 
-        verify(pizzaService).findById(999L);
+        verify(pizzaService).findById("999");
     }
 
     // ---------- filtering ----------
@@ -247,7 +247,7 @@ class PizzaControllerTest {
 
     @Test
     void updatePizza_ValidRequest_Returns200() {
-        when(pizzaService.update(eq(1L), any(UpdatePizzaRequest.class)))
+        when(pizzaService.update(eq("1"), any(UpdatePizzaRequest.class)))
                 .thenReturn(pizza(1, "Updated Pizza", "11.00", "Updated description for this pizza"));
 
         client.put().uri("/api/pizzas/{id}", 1)
@@ -260,7 +260,7 @@ class PizzaControllerTest {
                 .jsonPath("$.name").isEqualTo("Updated Pizza")
                 .jsonPath("$.price").isEqualTo(11.00);
 
-        verify(pizzaService).update(eq(1L), any(UpdatePizzaRequest.class));
+        verify(pizzaService).update(eq("1"), any(UpdatePizzaRequest.class));
     }
 
     @Test
@@ -282,8 +282,8 @@ class PizzaControllerTest {
 
     @Test
     void updatePizza_NonExistingId_Returns404() {
-        when(pizzaService.update(eq(999L), any(UpdatePizzaRequest.class)))
-                .thenThrow(new ResourceNotFoundException("Pizza", 999L));
+        when(pizzaService.update(eq("999"), any(UpdatePizzaRequest.class)))
+                .thenThrow(new ResourceNotFoundException("Pizza", "999"));
 
         client.put().uri("/api/pizzas/{id}", 999)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -291,27 +291,27 @@ class PizzaControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(pizzaService).update(eq(999L), any(UpdatePizzaRequest.class));
+        verify(pizzaService).update(eq("999"), any(UpdatePizzaRequest.class));
     }
 
     // ---------- deleting ----------
 
     @Test
     void deletePizza_ExistingId_Returns204() {
-        doNothing().when(pizzaService).delete(1L);
+        doNothing().when(pizzaService).delete("1");
 
         client.delete().uri("/api/pizzas/{id}", 1)
                 .exchange()
                 .expectStatus().isNoContent()
                 .expectBody().isEmpty();
 
-        verify(pizzaService).delete(1L);
+        verify(pizzaService).delete("1");
     }
 
     @Test
     void deletePizza_StillReferenced_Returns409() {
         // e.g. the pizza is still in a customer's favorites
-        doThrow(new DataIntegrityViolationException("FK constraint violation")).when(pizzaService).delete(1L);
+        doThrow(new DataIntegrityViolationException("FK constraint violation")).when(pizzaService).delete("1");
 
         // the SQL error is not leaked to the client
         client.delete().uri("/api/pizzas/{id}", 1)
@@ -323,13 +323,13 @@ class PizzaControllerTest {
 
     @Test
     void deletePizza_NonExistingId_Returns404() {
-        doThrow(new ResourceNotFoundException("Pizza", 999L)).when(pizzaService).delete(999L);
+        doThrow(new ResourceNotFoundException("Pizza", "999")).when(pizzaService).delete("999");
 
         client.delete().uri("/api/pizzas/{id}", 999)
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(pizzaService).delete(999L);
+        verify(pizzaService).delete("999");
     }
 
     // ---------- security: the same rules as in production ----------
@@ -384,9 +384,9 @@ class PizzaControllerTest {
 
     @Test
     void importNutritionalInfo_ValidBarcode_ReturnsUpdatedPizza() {
-        PizzaResponse updated = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"), "Classic", null, true,
+        PizzaResponse updated = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"), "Classic", null, true,
                 new NutritionalInfoResponse(539, new BigDecimal("6.30"), new BigDecimal("57.50"), new BigDecimal("30.90")));
-        when(nutritionImportService.importFromBarcode(1L, "3017620422003")).thenReturn(updated);
+        when(nutritionImportService.importFromBarcode("1", "3017620422003")).thenReturn(updated);
 
         client.post().uri("/api/pizzas/{id}/nutritional-info/import", 1)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -413,8 +413,8 @@ class PizzaControllerTest {
 
     @Test
     void importNutritionalInfo_UnknownPizza_Returns404() {
-        when(nutritionImportService.importFromBarcode(999L, "3017620422003"))
-                .thenThrow(new ResourceNotFoundException("Pizza", 999L));
+        when(nutritionImportService.importFromBarcode("999", "3017620422003"))
+                .thenThrow(new ResourceNotFoundException("Pizza", "999"));
 
         client.post().uri("/api/pizzas/{id}/nutritional-info/import", 999)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -425,7 +425,7 @@ class PizzaControllerTest {
 
     @Test
     void importNutritionalInfo_UnknownBarcode_Returns422() {
-        when(nutritionImportService.importFromBarcode(1L, "0000000000017"))
+        when(nutritionImportService.importFromBarcode("1", "0000000000017"))
                 .thenThrow(new BusinessException("Open Food Facts does not know a product with barcode 0000000000017"));
 
         client.post().uri("/api/pizzas/{id}/nutritional-info/import", 1)
@@ -439,7 +439,7 @@ class PizzaControllerTest {
 
     @Test
     void importNutritionalInfo_OpenFoodFactsDown_Returns502WithoutLeakingDetails() {
-        when(nutritionImportService.importFromBarcode(1L, "3017620422003"))
+        when(nutritionImportService.importFromBarcode("1", "3017620422003"))
                 .thenThrow(new ExternalServiceException("Open Food Facts is currently unavailable, please try again later",
                         new RuntimeException("Connection refused: secret-internal-host:443")));
 

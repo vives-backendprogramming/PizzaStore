@@ -63,47 +63,47 @@ class PizzaImageUploadControllerTest {
 
     @Test
     void uploadPizzaImage_ExistingPizza_ReturnsUpdatedPizza() throws Exception {
-        PizzaResponse response = new PizzaResponse(1L, "Margherita", new BigDecimal("8.50"),
+        PizzaResponse response = new PizzaResponse("1", "Margherita", new BigDecimal("8.50"),
                 "Classic", "/uploads/pizza-1.jpg", true, null);
-        when(pizzaService.uploadImage(eq(1L), any())).thenReturn(response);
+        when(pizzaService.uploadImage(eq("1"), any())).thenReturn(response);
 
         mockMvc.perform(multipart("/api/pizzas/1/image").file(image("test.jpg", MediaType.IMAGE_JPEG_VALUE)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
+                .andExpect(jsonPath("$.id", is("1")))
                 .andExpect(jsonPath("$.imageUrl", is("/uploads/pizza-1.jpg")));
 
-        verify(pizzaService).uploadImage(eq(1L), any());
+        verify(pizzaService).uploadImage(eq("1"), any());
     }
 
     @Test
     void uploadPizzaImage_NonExistingPizza_Returns404() throws Exception {
-        when(pizzaService.uploadImage(eq(999L), any())).thenThrow(new ResourceNotFoundException("Pizza", 999L));
+        when(pizzaService.uploadImage(eq("999"), any())).thenThrow(new ResourceNotFoundException("Pizza", "999"));
 
         mockMvc.perform(multipart("/api/pizzas/999/image").file(image("test.jpg", MediaType.IMAGE_JPEG_VALUE)))
                 .andExpect(status().isNotFound());
 
-        verify(pizzaService).uploadImage(eq(999L), any());
+        verify(pizzaService).uploadImage(eq("999"), any());
     }
 
     @Test
     void uploadPizzaImage_InvalidFile_Returns400() throws Exception {
-        when(pizzaService.uploadImage(eq(1L), any()))
+        when(pizzaService.uploadImage(eq("1"), any()))
                 .thenThrow(new InvalidFileException("Only JPG, JPEG, and PNG files are allowed"));
 
         mockMvc.perform(multipart("/api/pizzas/1/image").file(image("test.txt", MediaType.TEXT_PLAIN_VALUE)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail", is("Only JPG, JPEG, and PNG files are allowed")));
 
-        verify(pizzaService).uploadImage(eq(1L), any());
+        verify(pizzaService).uploadImage(eq("1"), any());
     }
 
     @Test
     void uploadPizzaImage_StorageError_Returns500() throws Exception {
-        when(pizzaService.uploadImage(eq(1L), any())).thenThrow(new RuntimeException("Storage error"));
+        when(pizzaService.uploadImage(eq("1"), any())).thenThrow(new RuntimeException("Storage error"));
 
         mockMvc.perform(multipart("/api/pizzas/1/image").file(image("test.jpg", MediaType.IMAGE_JPEG_VALUE)))
                 .andExpect(status().isInternalServerError());
 
-        verify(pizzaService).uploadImage(eq(1L), any());
+        verify(pizzaService).uploadImage(eq("1"), any());
     }
 }

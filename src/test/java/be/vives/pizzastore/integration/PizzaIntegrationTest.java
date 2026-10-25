@@ -1,18 +1,21 @@
 package be.vives.pizzastore.integration;
 
+import be.vives.pizzastore.MongoTestcontainersConfiguration;
 import be.vives.pizzastore.dto.request.CreatePizzaRequest;
 import be.vives.pizzastore.dto.request.UpdatePizzaRequest;
 import be.vives.pizzastore.dto.response.PizzaResponse;
 import tools.jackson.databind.json.JsonMapper;
+import be.vives.pizzastore.repository.PizzaRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -22,12 +25,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
+@Import(MongoTestcontainersConfiguration.class)
 @AutoConfigureMockMvc
-@Transactional
+// No @Transactional: in the JPA version it rolls back everything a test wrote. MongoDB has no such rollback here
+// (no transaction manager, see PizzaService), so the test cleans up after itself instead.
 class PizzaIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private PizzaRepository pizzaRepository;
+
+    @AfterEach
+    void cleanUp() {
+        pizzaRepository.deleteAll();
+    }
 
     @Autowired
     private JsonMapper objectMapper;
@@ -55,12 +68,12 @@ class PizzaIntegrationTest {
         // Extract ID from Location header
         String location = createResult.getResponse().getHeader("Location");
         assertThat(location).isNotNull();
-        Long pizzaId = Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
+        String pizzaId = location.substring(location.lastIndexOf('/') + 1);
 
         // Then - Retrieve pizza
         mockMvc.perform(get("/api/pizzas/" + pizzaId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(pizzaId.intValue())))
+                .andExpect(jsonPath("$.id", is(pizzaId)))
                 .andExpect(jsonPath("$.name", is("Integration Test Pizza")))
                 .andExpect(jsonPath("$.price", is(13.50)))
                 .andExpect(jsonPath("$.description", containsString("integration test")));
@@ -88,7 +101,7 @@ class PizzaIntegrationTest {
                 createResult.getResponse().getContentAsString(),
                 PizzaResponse.class
         );
-        Long pizzaId = created.id();
+        String pizzaId = created.id();
 
         // Read
         mockMvc.perform(get("/api/pizzas/" + pizzaId))

@@ -112,7 +112,7 @@ public class PizzaController {
             @ApiResponse(responseCode = "404", description = "Pizza not found")
     })
     public ResponseEntity<PizzaResponse> getPizza(
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String id) {
         log.debug("GET /api/pizzas/{}", id);
         PizzaResponse pizza = pizzaService.findById(id);
         return ResponseEntity.ok(pizza);
@@ -166,7 +166,7 @@ public class PizzaController {
             @ApiResponse(responseCode = "404", description = "Pizza not found")
     })
     public ResponseEntity<PizzaResponse> updatePizza(
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long id,
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String id,
             @Valid @RequestBody UpdatePizzaRequest request) {
 
         log.debug("PUT /api/pizzas/{} - {}", id, request);
@@ -188,7 +188,7 @@ public class PizzaController {
             @ApiResponse(responseCode = "404", description = "Pizza not found")
     })
     public ResponseEntity<Void> deletePizza(
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long id) {
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String id) {
         log.debug("DELETE /api/pizzas/{}", id);
 
         pizzaService.delete(id);
@@ -214,7 +214,7 @@ public class PizzaController {
             @ApiResponse(responseCode = "500", description = "Error uploading file")
     })
     public ResponseEntity<PizzaResponse> uploadPizzaImage(
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long id,
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String id,
             @Parameter(description = "Image file (JPEG, PNG, or GIF, max 5MB)", required = true)
             @RequestParam("image") MultipartFile file) {
         
@@ -249,7 +249,7 @@ public class PizzaController {
             @ApiResponse(responseCode = "502", description = "Open Food Facts is unavailable, too slow or rate-limiting us")
     })
     public ResponseEntity<PizzaResponse> importNutritionalInfo(
-            @Parameter(description = "Pizza ID", required = true) @PathVariable Long id,
+            @Parameter(description = "Pizza ID", required = true) @PathVariable String id,
             @Valid @RequestBody ImportNutritionRequest request) {
 
         log.debug("POST /api/pizzas/{}/nutritional-info/import - {}", id, request);

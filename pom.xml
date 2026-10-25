@@ -15,8 +15,8 @@
     <groupId>be.vives</groupId>
     <artifactId>pizzastore</artifactId>
     <version>1.0.0</version>
-    <name>PizzaStore with OpenAPI Documentation</name>
-    <description>Complete REST API with JWT Authentication and OpenAPI/Swagger Documentation</description>
+    <name>PizzaStore with MongoDB</name>
+    <description>Complete REST API with JWT Authentication and OpenAPI/Swagger Documentation, persisted in MongoDB</description>
 
     <properties>
         <java.version>25</java.version>
@@ -31,35 +31,16 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!-- Spring Data MongoDB (this branch); the main branch uses spring-boot-starter-data-jpa -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
 
         <!-- RestClient + declarative HTTP clients (@HttpExchange / @ImportHttpServices): PizzaStore calls Open Food Facts -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-restclient</artifactId>
-        </dependency>
-
-        <!-- H2 Database -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
-        <!-- H2 Console: web-based DB browser at /h2-console (its own module as of Spring Boot 4) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-h2console</artifactId>
-        </dependency>
-
-        <!-- PostgreSQL driver for the prod profile (application-prod.properties) -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
         </dependency>
 
         <!-- MapStruct -->
@@ -121,9 +102,26 @@
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- @DataMongoTest slice -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <artifactId>spring-boot-starter-data-mongodb-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- A real MongoDB in a Docker container for the tests (@ServiceConnection); Testcontainers 2.x, version managed by Spring Boot -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-mongodb</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

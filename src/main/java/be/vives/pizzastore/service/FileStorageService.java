@@ -42,7 +42,7 @@ public class FileStorageService {
         }
     }
 
-    public String storeFile(MultipartFile file, Long pizzaId) {
+    public String storeFile(MultipartFile file, String pizzaId) {
         validateFile(file);
         
         String originalFilename = file.getOriginalFilename();

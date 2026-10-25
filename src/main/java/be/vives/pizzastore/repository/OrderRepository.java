@@ -5,40 +5,42 @@ import be.vives.pizzastore.domain.OrderStatus;
 import be.vives.pizzastore.repository.projection.PizzaSalesStatistics;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.data.mongodb.repository.Aggregation;
+import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 import java.util.Optional;
 
-public interface OrderRepository extends JpaRepository<Order, Long> {
+public interface OrderRepository extends MongoRepository<Order, String> {
 
-    List<Order> findByCustomerId(Long customerId);
+    List<Order> findByCustomerId(String customerId);
 
-    Page<Order> findByCustomerId(Long customerId, Pageable pageable);
+    Page<Order> findByCustomerId(String customerId, Pageable pageable);
 
     List<Order> findByStatus(OrderStatus status);
 
     Optional<Order> findByOrderNumber(String orderNumber);
 
-    // for OrderSecurity: does this order belong to the customer with this e-mail address?
-    boolean existsByIdAndCustomerEmail(Long id, String email);
+    // for OrderSecurity: does this order belong to this customer? The JPA version could follow o.customer.email
+    // with a join; a Mongo query only sees the order document itself, so the caller first looks up the customer id
+    boolean existsByIdAndCustomerId(String id, String customerId);
 
-    // JOIN FETCH to avoid N+1 problem
-    @Query("SELECT o FROM Order o JOIN FETCH o.orderLines ol JOIN FETCH ol.pizza WHERE o.id = :id")
-    Optional<Order> findByIdWithOrderLines(@Param("id") Long id);
+    // "orderLines.pizzaId" looks inside the embedded order lines: is this pizza in any order?
+    boolean existsByOrderLinesPizzaId(String pizzaId);
 
-    @Query("SELECT o FROM Order o JOIN FETCH o.customer WHERE o.customer.id = :customerId")
-    List<Order> findByCustomerIdWithCustomer(@Param("customerId") Long customerId);
+    void deleteByCustomerId(String customerId);
 
-    // DTO projection: the result is a PizzaSalesStatistics record, not an Order/OrderLine entity
-    @Query("""
-            SELECT new be.vives.pizzastore.repository.projection.PizzaSalesStatistics(
-                ol.pizza.name, COUNT(ol), SUM(ol.quantity), SUM(ol.subtotal))
-            FROM Order o JOIN o.orderLines ol
-            GROUP BY ol.pizza.name
-            ORDER BY SUM(ol.quantity) DESC
-            """)
+    // No findByIdWithOrderLines()/findByCustomerIdWithCustomer(): the order lines and the customer's name are
+    // part of the Order document, so a plain findById()/findByCustomerId() already returns them.
+
+    // DTO projection with the aggregation framework: the equivalent of the JPA version's
+    // SELECT new PizzaSalesStatistics(...) ... GROUP BY ... ORDER BY. Each string is one pipeline stage:
+    // one document per order line, grouped by pizza name, renamed to the record's components, sorted.
+    @Aggregation(pipeline = {
+            "{ '$unwind': '$orderLines' }",
+            "{ '$group': { '_id': '$orderLines.pizzaName', 'timesOrdered': { '$sum': 1 }, 'totalQuantitySold': { '$sum': '$orderLines.quantity' }, 'totalRevenue': { '$sum': '$orderLines.subtotal' } } }",
+            "{ '$project': { '_id': 0, 'pizzaName': '$_id', 'timesOrdered': 1, 'totalQuantitySold': 1, 'totalRevenue': 1 } }",
+            "{ '$sort': { 'totalQuantitySold': -1 } }"
+    })
     List<PizzaSalesStatistics> findPizzaSalesStatistics();
 }

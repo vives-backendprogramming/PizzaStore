@@ -68,21 +68,21 @@ class OrderControllerTest {
     private static final String EMMA = "emma@pizzastore.be";
 
     private static OrderResponse order(long id, long customerId, String customerName, OrderStatus status, double total) {
-        return new OrderResponse(id, "ORD-2024-%06d".formatted(id), customerId, customerName,
+        return new OrderResponse(String.valueOf(id), "ORD-2024-%06d".formatted(id), String.valueOf(customerId), customerName,
                 List.of(), BigDecimal.valueOf(total), status, LocalDateTime.now());
     }
 
     private static OrderResponse orderWithLines() {
-        OrderLineResponse line1 = new OrderLineResponse(1L, 1L, "Margherita", 2, BigDecimal.valueOf(8.50), BigDecimal.valueOf(17.00));
-        OrderLineResponse line2 = new OrderLineResponse(2L, 2L, "Pepperoni", 1, BigDecimal.valueOf(10.00), BigDecimal.valueOf(10.00));
-        return new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe",
+        OrderLineResponse line1 = new OrderLineResponse("1", "Margherita", 2, BigDecimal.valueOf(8.50), BigDecimal.valueOf(17.00));
+        OrderLineResponse line2 = new OrderLineResponse("2", "Pepperoni", 1, BigDecimal.valueOf(10.00), BigDecimal.valueOf(10.00));
+        return new OrderResponse("1", "ORD-2024-000001", "1", "John Doe",
                 List.of(line1, line2), BigDecimal.valueOf(27.00), OrderStatus.PENDING, LocalDateTime.now());
     }
 
     private static CreateOrderRequest validOrderRequest() {
         return new CreateOrderRequest(List.of(
-                new CreateOrderRequest.OrderLineRequest(1L, 2),
-                new CreateOrderRequest.OrderLineRequest(2L, 1)));
+                new CreateOrderRequest.OrderLineRequest("1", 2),
+                new CreateOrderRequest.OrderLineRequest("2", 1)));
     }
 
     // ---------- reading (ADMIN) ----------
@@ -112,7 +112,7 @@ class OrderControllerTest {
     @WithMockUser(roles = "ADMIN")
     void getOrders_withCustomerId_shouldReturnCustomerOrders() {
         Page<OrderResponse> page = new PageImpl<>(List.of(order(1, 1, "John Doe", OrderStatus.PENDING, 25.50)));
-        when(orderService.findByCustomerId(eq(1L), any(Pageable.class))).thenReturn(page);
+        when(orderService.findByCustomerId(eq("1"), any(Pageable.class))).thenReturn(page);
 
         client.get().uri("/api/orders?customerId=1&page=0&size=10")
                 .exchange()
@@ -122,7 +122,7 @@ class OrderControllerTest {
                 .jsonPath("$.content[0].customerId").isEqualTo(1)
                 .jsonPath("$.content[0].customerName").isEqualTo("John Doe");
 
-        verify(orderService).findByCustomerId(eq(1L), any(Pageable.class));
+        verify(orderService).findByCustomerId(eq("1"), any(Pageable.class));
         verify(orderService, never()).findAll(any());
         verify(orderService, never()).findByStatus(any(), any());
     }
@@ -149,7 +149,7 @@ class OrderControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void getOrder_whenExists_shouldReturnOrder() {
-        when(orderService.findById(1L)).thenReturn(orderWithLines());
+        when(orderService.findById("1")).thenReturn(orderWithLines());
 
         client.get().uri("/api/orders/{id}", 1)
                 .exchange()
@@ -164,19 +164,19 @@ class OrderControllerTest {
                 .jsonPath("$.orderLines[1].pizzaName").isEqualTo("Pepperoni")
                 .jsonPath("$.orderLines[1].quantity").isEqualTo(1);
 
-        verify(orderService).findById(1L);
+        verify(orderService).findById("1");
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void getOrder_whenNotExists_shouldReturnNotFound() {
-        when(orderService.findById(999L)).thenThrow(new ResourceNotFoundException("Order", 999L));
+        when(orderService.findById("999")).thenThrow(new ResourceNotFoundException("Order", "999"));
 
         client.get().uri("/api/orders/{id}", 999)
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).findById(999L);
+        verify(orderService).findById("999");
     }
 
     // ---------- creating (CUSTOMER) ----------
@@ -245,7 +245,7 @@ class OrderControllerTest {
     @WithMockUser(roles = "CUSTOMER")
     void createOrder_withInvalidOrderLine_shouldReturnBadRequest() {
         // a negative quantity must be rejected before it ever reaches the service
-        CreateOrderRequest request = new CreateOrderRequest(List.of(new CreateOrderRequest.OrderLineRequest(1L, -5)));
+        CreateOrderRequest request = new CreateOrderRequest(List.of(new CreateOrderRequest.OrderLineRequest("1", -5)));
 
         client.post().uri("/api/orders")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -261,7 +261,7 @@ class OrderControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void updateOrderStatus_whenExists_shouldReturnUpdatedOrder() {
-        when(orderService.updateStatus(eq(1L), eq(OrderStatus.PREPARING)))
+        when(orderService.updateStatus(eq("1"), eq(OrderStatus.PREPARING)))
                 .thenReturn(order(1, 1, "John Doe", OrderStatus.PREPARING, 27.00));
 
         client.patch().uri("/api/orders/{id}/status", 1)
@@ -273,14 +273,14 @@ class OrderControllerTest {
                 .jsonPath("$.id").isEqualTo(1)
                 .jsonPath("$.status").isEqualTo("PREPARING");
 
-        verify(orderService).updateStatus(eq(1L), eq(OrderStatus.PREPARING));
+        verify(orderService).updateStatus(eq("1"), eq(OrderStatus.PREPARING));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void updateOrderStatus_whenNotExists_shouldReturnNotFound() {
-        when(orderService.updateStatus(eq(999L), eq(OrderStatus.PREPARING)))
-                .thenThrow(new ResourceNotFoundException("Order", 999L));
+        when(orderService.updateStatus(eq("999"), eq(OrderStatus.PREPARING)))
+                .thenThrow(new ResourceNotFoundException("Order", "999"));
 
         client.patch().uri("/api/orders/{id}/status", 999)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -288,7 +288,7 @@ class OrderControllerTest {
                 .exchange()
                 .expectStatus().isNotFound();
 
-        verify(orderService).updateStatus(eq(999L), eq(OrderStatus.PREPARING));
+        verify(orderService).updateStatus(eq("999"), eq(OrderStatus.PREPARING));
     }
 
     @Test
@@ -327,13 +327,13 @@ class OrderControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void cancelOrder_shouldReturnNoContent() {
-        doNothing().when(orderService).cancel(1L);
+        doNothing().when(orderService).cancel("1");
 
         client.delete().uri("/api/orders/{id}", 1)
                 .exchange()
                 .expectStatus().isNoContent();
 
-        verify(orderService).cancel(1L);
+        verify(orderService).cancel("1");
     }
 
     // ---------- security: who may do what ----------
@@ -366,8 +366,8 @@ class OrderControllerTest {
     @Test
     @WithMockUser(username = EMMA, roles = "CUSTOMER")
     void getOrder_ownOrder_asCustomer_returnsOrder() {
-        when(orderSecurity.isOwner(eq(1L), any())).thenReturn(true);
-        when(orderService.findById(1L)).thenReturn(orderWithLines());
+        when(orderSecurity.isOwner(eq("1"), any())).thenReturn(true);
+        when(orderService.findById("1")).thenReturn(orderWithLines());
 
         client.get().uri("/api/orders/{id}", 1)
                 .exchange()
@@ -375,7 +375,7 @@ class OrderControllerTest {
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(1);
 
-        verify(orderService).findById(1L);
+        verify(orderService).findById("1");
     }
 
     @Test
@@ -405,14 +405,14 @@ class OrderControllerTest {
     @Test
     @WithMockUser(username = EMMA, roles = "CUSTOMER")
     void cancelOrder_ownOrder_asCustomer_returnsNoContent() {
-        when(orderSecurity.isOwner(eq(1L), any())).thenReturn(true);
-        doNothing().when(orderService).cancel(1L);
+        when(orderSecurity.isOwner(eq("1"), any())).thenReturn(true);
+        doNothing().when(orderService).cancel("1");
 
         client.delete().uri("/api/orders/{id}", 1)
                 .exchange()
                 .expectStatus().isNoContent();
 
-        verify(orderService).cancel(1L);
+        verify(orderService).cancel("1");
     }
 
     @Test

@@ -51,7 +51,6 @@ public class SecurityConfig {
                         // Public endpoints - anyone can access
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/pizzas/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
                         // Spring Boot's error page: an error outside Spring MVC is rendered by forwarding to /error.
                         // That forward has no JWT, so a protected /error would turn such an error into a 401
                         .requestMatchers("/error").permitAll()
@@ -95,10 +94,6 @@ public class SecurityConfig {
                                 exceptionResolver.resolveException(request, response, null, accessDeniedException))
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        // For H2 Console
-        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
-
         return http.build();
     }
 
