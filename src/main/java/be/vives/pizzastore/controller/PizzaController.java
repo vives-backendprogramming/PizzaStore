@@ -1,8 +1,10 @@
 package be.vives.pizzastore.controller;
 
 import be.vives.pizzastore.dto.request.CreatePizzaRequest;
+import be.vives.pizzastore.dto.request.ImportNutritionRequest;
 import be.vives.pizzastore.dto.request.UpdatePizzaRequest;
 import be.vives.pizzastore.dto.response.PizzaResponse;
+import be.vives.pizzastore.service.NutritionImportService;
 import be.vives.pizzastore.service.PizzaService;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,18 +37,20 @@ public class PizzaController {
     private static final Logger log = LoggerFactory.getLogger(PizzaController.class);
 
     private final PizzaService pizzaService;
+    private final NutritionImportService nutritionImportService;
 
-    public PizzaController(PizzaService pizzaService) {
+    public PizzaController(PizzaService pizzaService, NutritionImportService nutritionImportService) {
         this.pizzaService = pizzaService;
+        this.nutritionImportService = nutritionImportService;
     }
 
     @GetMapping
     @Operation(
             summary = "Get all pizzas",
             description = """
-                    Retrieves a list of all available pizzas. Supports filtering by price range and name, and pagination.
+                    Retrieves pizzas. Supports filtering by price range and name, or (without a filter) pagination.
                     
-                    **Pagination parameters** (query params):
+                    **Pagination parameters** (query params, ignored when a filter is used):
                     - `page`: Page number (0-indexed, default: 0)
                     - `size`: Items per page (default: 20)
                     - `sort`: Sort field and direction (e.g., `name,asc` or `price,desc`)
@@ -55,8 +59,11 @@ public class PizzaController {
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Successfully retrieved pizzas",
-                    content = @Content(schema = @Schema(implementation = Page.class))
+                    description = """
+                            Without filter: a page of pizzas (`content` holds the PizzaResponse objects).
+                            With minPrice/maxPrice or name: a plain JSON array of PizzaResponse objects, without paging.
+                            """,
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = Page.class))
             )
     })
     public ResponseEntity<?> getPizzas(
@@ -107,9 +114,8 @@ public class PizzaController {
     public ResponseEntity<PizzaResponse> getPizza(
             @Parameter(description = "Pizza ID", required = true) @PathVariable Long id) {
         log.debug("GET /api/pizzas/{}", id);
-        return pizzaService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        PizzaResponse pizza = pizzaService.findById(id);
+        return ResponseEntity.ok(pizza);
     }
 
     @PostMapping
@@ -165,9 +171,8 @@ public class PizzaController {
 
         log.debug("PUT /api/pizzas/{} - {}", id, request);
 
-        return pizzaService.update(id, request)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        PizzaResponse updated = pizzaService.update(id, request);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
@@ -186,10 +191,8 @@ public class PizzaController {
             @Parameter(description = "Pizza ID", required = true) @PathVariable Long id) {
         log.debug("DELETE /api/pizzas/{}", id);
 
-        if (pizzaService.delete(id)) {
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.notFound().build();
+        pizzaService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/image")
@@ -217,16 +220,41 @@ public class PizzaController {
         
         log.debug("POST /api/pizzas/{}/image", id);
 
-        try {
-            return pizzaService.uploadImage(id, file)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid file upload: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
-        } catch (RuntimeException e) {
-            log.error("Error uploading file: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
+        PizzaResponse updated = pizzaService.uploadImage(id, file);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id}/nutritional-info/import")
+    @Operation(
+            summary = "Import nutritional info from Open Food Facts",
+            description = """
+                    Fills the nutritional info of a pizza (per 100 g) with the data that the free
+                    [Open Food Facts](https://world.openfoodfacts.org) database has for a barcode,
+                    e.g. of a comparable packaged product. An existing nutritional info is overwritten.
+                    Requires ADMIN role.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Nutritional info imported",
+                    content = @Content(schema = @Schema(implementation = PizzaResponse.class))
+            ),
+            @ApiResponse(responseCode = "400", description = "Barcode is missing or not a valid EAN/UPC number"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - JWT token missing or invalid"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - ADMIN role required"),
+            @ApiResponse(responseCode = "404", description = "Pizza not found"),
+            @ApiResponse(responseCode = "422", description = "Open Food Facts does not know the barcode, or has no complete nutritional data for it"),
+            @ApiResponse(responseCode = "502", description = "Open Food Facts is unavailable, too slow or rate-limiting us")
+    })
+    public ResponseEntity<PizzaResponse> importNutritionalInfo(
+            @Parameter(description = "Pizza ID", required = true) @PathVariable Long id,
+            @Valid @RequestBody ImportNutritionRequest request) {
+
+        log.debug("POST /api/pizzas/{}/nutritional-info/import - {}", id, request);
+
+        PizzaResponse updated = nutritionImportService.importFromBarcode(id, request.barcode());
+        return ResponseEntity.ok(updated);
     }
 }

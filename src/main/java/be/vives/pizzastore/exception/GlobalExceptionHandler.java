@@ -2,28 +2,45 @@ package be.vives.pizzastore.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Turns every exception into an RFC 7807 {@link ProblemDetail} response.
+ * <p>
+ * Extending {@link ResponseEntityExceptionHandler} makes the exceptions Spring MVC itself throws
+ * (405 Method Not Allowed, 404 No Resource Found, 400 type mismatch, 413 Payload Too Large, ...)
+ * return a ProblemDetail as well. Those are customised by overriding its protected methods,
+ * not with an extra {@code @ExceptionHandler} (that would be an ambiguous mapping).
+ */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String ERROR_TYPE_BASE = "https://api.pizzastore.example.com/errors/";
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ProblemDetail handleValidationException(MethodArgumentNotValidException ex, WebRequest request) {
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+                                                                  HttpHeaders headers, HttpStatusCode status,
+                                                                  WebRequest request) {
         log.warn("Validation failed for request: {}", request.getDescription(false));
 
         List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
@@ -37,7 +54,25 @@ public class GlobalExceptionHandler {
 
         ProblemDetail problemDetail = buildProblemDetail(HttpStatus.BAD_REQUEST, "Validation failed", "validation", request);
         problemDetail.setProperty("errors", errors);
-        return problemDetail;
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).headers(headers).body(problemDetail);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+                                                                  HttpHeaders headers, HttpStatusCode status,
+                                                                  WebRequest request) {
+        log.warn("Malformed JSON request: {}", ex.getMessage());
+
+        String detail = "Malformed JSON request";
+        if (ex.getCause() != null) {
+            String causeMessage = ex.getCause().getMessage();
+            if (causeMessage != null && causeMessage.contains("OrderStatus")) {
+                detail = "Invalid OrderStatus value. Allowed values: PENDING, CONFIRMED, PREPARING, READY, DELIVERED, CANCELLED";
+            }
+        }
+
+        ProblemDetail problemDetail = buildProblemDetail(HttpStatus.BAD_REQUEST, detail, "malformed-request", request);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).headers(headers).body(problemDetail);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -58,27 +93,45 @@ public class GlobalExceptionHandler {
         return buildProblemDetail(HttpStatus.UNPROCESSABLE_CONTENT, ex.getMessage(), "business-rule", request);
     }
 
+    @ExceptionHandler(ExternalServiceException.class)
+    public ProblemDetail handleExternalServiceException(ExternalServiceException ex, WebRequest request) {
+        // The cause (timeout, 503, ...) is logged by the service; the client only needs to know it is not their fault
+        log.warn("External service failure: {}", ex.getMessage());
+        return buildProblemDetail(HttpStatus.BAD_GATEWAY, ex.getMessage(), "external-service", request);
+    }
+
     @ExceptionHandler(PizzaStoreException.class)
     public ProblemDetail handlePizzaStoreException(PizzaStoreException ex, WebRequest request) {
-        log.warn("PizzaStore business error: {}", ex.getMessage());
-        return buildProblemDetail(HttpStatus.BAD_REQUEST, ex.getMessage(), "business-rule", request);
+        log.warn("PizzaStore error: {}", ex.getMessage());
+        return buildProblemDetail(HttpStatus.BAD_REQUEST, ex.getMessage(), "bad-request", request);
     }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ProblemDetail handleHttpMessageNotReadable(HttpMessageNotReadableException ex, WebRequest request) {
-        log.warn("Malformed JSON request: {}", ex.getMessage());
-
-        String detail = "Malformed JSON request";
-        if (ex.getCause() != null) {
-            String causeMessage = ex.getCause().getMessage();
-            if (causeMessage != null && causeMessage.contains("OrderStatus")) {
-                detail = "Invalid OrderStatus value. Allowed values: PENDING, CONFIRMED, PREPARING, READY, DELIVERED, CANCELLED";
-            }
-        }
-
-        return buildProblemDetail(HttpStatus.BAD_REQUEST, detail, "malformed-request", request);
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex, WebRequest request) {
+        // Don't leak the SQL error to the client: log it, return a generic message
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        return buildProblemDetail(HttpStatus.CONFLICT,
+                "The request conflicts with existing data (e.g. the resource is still referenced by other data).",
+                "conflict", request);
     }
 
+    // from the entry point in SecurityConfig: a protected endpoint without a (valid) token
+    @ExceptionHandler(InsufficientAuthenticationException.class)
+    public ProblemDetail handleMissingAuthentication(InsufficientAuthenticationException ex, WebRequest request) {
+        log.warn("Authentication required: {}", ex.getMessage());
+        return buildProblemDetail(HttpStatus.UNAUTHORIZED,
+                "Authentication required. Send a valid JWT token in the Authorization header.", "unauthorized", request);
+    }
+
+    // a failed login (AuthController)
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthenticationException(AuthenticationException ex, WebRequest request) {
+        // one message for "unknown e-mail" and "wrong password": never reveal which e-mail addresses have an account
+        log.warn("Authentication failed: {}", ex.getMessage());
+        return buildProblemDetail(HttpStatus.UNAUTHORIZED, "Invalid email or password", "unauthorized", request);
+    }
+
+    // a URL rule (access-denied handler in SecurityConfig) or method security (@PreAuthorize) said no
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
         log.warn("Access denied: {}", ex.getMessage());
@@ -86,8 +139,8 @@ public class GlobalExceptionHandler {
                 "Access denied. You do not have permission to access this resource.", "access-denied", request);
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class, NullPointerException.class})
-    public ProblemDetail handleGenericException(Exception ex, WebRequest request) {
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpectedException(Exception ex, WebRequest request) {
         log.error("Unexpected error occurred", ex);
         return buildProblemDetail(HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred. Please contact support if the problem persists.", "internal-error", request);

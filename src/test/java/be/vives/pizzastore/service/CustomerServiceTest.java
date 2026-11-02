@@ -6,6 +6,7 @@ import be.vives.pizzastore.dto.request.CreateCustomerRequest;
 import be.vives.pizzastore.dto.request.UpdateCustomerRequest;
 import be.vives.pizzastore.dto.response.CustomerResponse;
 import be.vives.pizzastore.dto.response.PizzaResponse;
+import be.vives.pizzastore.exception.DuplicateResourceException;
 import be.vives.pizzastore.exception.ResourceNotFoundException;
 import be.vives.pizzastore.mapper.CustomerMapper;
 import be.vives.pizzastore.mapper.PizzaMapper;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -45,6 +47,9 @@ class CustomerServiceTest {
 
     @Mock
     private PizzaMapper pizzaMapper;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private CustomerService customerService;
@@ -146,6 +151,7 @@ class CustomerServiceTest {
         CustomerResponse response = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
 
         when(customerMapper.toEntity(request)).thenReturn(customer);
+        when(passwordEncoder.encode("password123")).thenReturn("{bcrypt}hashed");
         when(customerRepository.save(customer)).thenReturn(savedCustomer);
         when(customerMapper.toResponse(savedCustomer)).thenReturn(response);
 
@@ -156,7 +162,42 @@ class CustomerServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.name()).isEqualTo("John Doe");
         assertThat(result.email()).isEqualTo("john@example.com");
+        // never store the password as typed
+        assertThat(customer.getPassword()).isEqualTo("{bcrypt}hashed");
         verify(customerRepository).save(customer);
+    }
+
+    @Test
+    void findByEmail_whenExists_shouldReturnCustomer() {
+        Customer customer = new Customer("John Doe", "john@example.com");
+        CustomerResponse response = new CustomerResponse(1L, "John Doe", "john@example.com", null, null, "CUSTOMER");
+        when(customerRepository.findByEmail("john@example.com")).thenReturn(Optional.of(customer));
+        when(customerMapper.toResponse(customer)).thenReturn(response);
+
+        assertThat(customerService.findByEmail("john@example.com").id()).isEqualTo(1L);
+    }
+
+    @Test
+    void findByEmail_whenNotExists_shouldThrowException() {
+        when(customerRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> customerService.findByEmail("nobody@example.com"))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("nobody@example.com");
+    }
+
+    @Test
+    void create_whenEmailAlreadyExists_shouldThrowDuplicateResourceException() {
+        // Arrange
+        CreateCustomerRequest request = new CreateCustomerRequest("John Doe", "john@example.com", "password123", null, null);
+        when(customerRepository.existsByEmail("john@example.com")).thenReturn(true);
+
+        // Act & Assert
+        assertThatThrownBy(() -> customerService.create(request))
+                .isInstanceOf(DuplicateResourceException.class)
+                .hasMessageContaining("john@example.com");
+
+        verify(customerRepository, never()).save(any());
     }
 
     @Test

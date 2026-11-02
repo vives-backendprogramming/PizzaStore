@@ -12,9 +12,9 @@ import be.vives.pizzastore.security.JwtUtil;
 import be.vives.pizzastore.security.SecurityConfig;
 import be.vives.pizzastore.service.CustomerService;
 import be.vives.pizzastore.service.OrderService;
-import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTestClient;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
@@ -24,31 +24,31 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.client.RestTestClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+/**
+ * Web-layer slice for CustomerController with RestTestClient and the real SecurityConfig.
+ * Every /api/customers endpoint outside /me is for ADMIN, by a URL rule: a CUSTOMER gets 403 even for their own id
+ * (their account is at /api/customers/me, see CurrentCustomerControllerTest).
+ */
 @WebMvcTest(controllers = CustomerController.class)
-@Import({SecurityConfig.class,GlobalExceptionHandler.class})
+@AutoConfigureRestTestClient
+@Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class CustomerControllerTest {
 
     @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private JsonMapper objectMapper;
+    private RestTestClient client;
 
     @MockitoBean
     private CustomerService customerService;
@@ -62,245 +62,285 @@ class CustomerControllerTest {
     @MockitoBean
     private JwtUtil jwtUtil;
 
+    private static CustomerResponse john() {
+        return new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+    }
+
     @Test
     @WithMockUser(roles = "ADMIN")
-    void getAllCustomers_shouldReturnPageOfCustomers() throws Exception {
-        // Arrange
-        CustomerResponse customer1 = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
-        CustomerResponse customer2 = new CustomerResponse(2L, "Jane Smith", "jane@example.com", "0987654321", "456 Oak Ave", "CUSTOMER");
-        Page<CustomerResponse> page = new PageImpl<>(Arrays.asList(customer1, customer2));
+    void getAllCustomers_shouldReturnPageOfCustomers() {
+        CustomerResponse jane = new CustomerResponse(2L, "Jane Smith", "jane@example.com", "0987654321", "456 Oak Ave", "CUSTOMER");
+        when(customerService.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of(john(), jane)));
 
-        when(customerService.findAll(any(Pageable.class))).thenReturn(page);
-
-        // Act & Assert
-        mockMvc.perform(get("/api/customers")
-                        .param("page", "0")
-                        .param("size", "10"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].name", is("John Doe")))
-                .andExpect(jsonPath("$.content[0].email", is("john@example.com")))
-                .andExpect(jsonPath("$.content[1].name", is("Jane Smith")));
+        client.get().uri("/api/customers?page=0&size=10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.content.length()").isEqualTo(2)
+                .jsonPath("$.content[0].name").isEqualTo("John Doe")
+                .jsonPath("$.content[0].email").isEqualTo("john@example.com")
+                .jsonPath("$.content[1].name").isEqualTo("Jane Smith");
 
         verify(customerService).findAll(any(Pageable.class));
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void getCustomer_whenExists_shouldReturnCustomer() throws Exception {
-        // Arrange
-        CustomerResponse customer = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+    @WithMockUser(roles = "ADMIN")
+    void getCustomer_whenExists_shouldReturnCustomer() {
+        when(customerService.findById(1L)).thenReturn(john());
 
-        when(customerService.findById(1L)).thenReturn(customer);
-
-        // Act & Assert
-        mockMvc.perform(get("/api/customers/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.name", is("John Doe")))
-                .andExpect(jsonPath("$.email", is("john@example.com")))
-                .andExpect(jsonPath("$.address", is("123 Main St")))
-                .andExpect(jsonPath("$.phone", is("1234567890")));
+        client.get().uri("/api/customers/{id}", 1)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(1)
+                .jsonPath("$.name").isEqualTo("John Doe")
+                .jsonPath("$.email").isEqualTo("john@example.com")
+                .jsonPath("$.address").isEqualTo("123 Main St")
+                .jsonPath("$.phone").isEqualTo("1234567890");
 
         verify(customerService).findById(1L);
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void getCustomer_whenNotExists_shouldReturnProblemDetail() throws Exception {
-        // Arrange
+    @WithMockUser(roles = "ADMIN")
+    void getCustomer_whenNotExists_shouldReturnProblemDetail() {
         when(customerService.findById(999L)).thenThrow(new ResourceNotFoundException("Customer", 999L));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/customers/999"))
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.status", is(404)))
-                .andExpect(jsonPath("$.title", is("Not Found")))
-                .andExpect(jsonPath("$.detail", is("Customer with id 999 not found")))
-                .andExpect(jsonPath("$.type", is("https://api.pizzastore.example.com/errors/not-found")))
-                .andExpect(jsonPath("$.instance", is("/api/customers/999")));
+        client.get().uri("/api/customers/{id}", 999)
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(404)
+                .jsonPath("$.title").isEqualTo("Not Found")
+                .jsonPath("$.detail").isEqualTo("Customer with id 999 not found")
+                .jsonPath("$.type").isEqualTo("https://api.pizzastore.example.com/errors/not-found")
+                .jsonPath("$.instance").isEqualTo("/api/customers/999");
 
         verify(customerService).findById(999L);
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void createCustomer_withInvalidEmail_shouldReturnValidationProblemDetail() throws Exception {
-        // Arrange - every field is valid except email, so exactly one violation is produced
-        // (name="Jane Doe" satisfies @NotBlank+@Size, password="password123" satisfies
-        // @NotBlank+@Size(min=8), phone/address satisfy their @Size(max=...) constraints)
+    void createCustomer_withInvalidEmail_shouldReturnValidationProblemDetail() {
+        // every field is valid except email, so exactly one violation is produced
         CreateCustomerRequest request = new CreateCustomerRequest(
                 "Jane Doe", "not-an-email", "password123", "1234567890", "123 Main St");
 
-        // Act & Assert
-        mockMvc.perform(post("/api/customers")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.title", is("Bad Request")))
-                .andExpect(jsonPath("$.detail", is("Validation failed")))
-                .andExpect(jsonPath("$.type", is("https://api.pizzastore.example.com/errors/validation")))
-                .andExpect(jsonPath("$.errors", hasSize(1)))
-                .andExpect(jsonPath("$.errors[0].field", is("email")));
+        client.post().uri("/api/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(400)
+                .jsonPath("$.title").isEqualTo("Bad Request")
+                .jsonPath("$.detail").isEqualTo("Validation failed")
+                .jsonPath("$.type").isEqualTo("https://api.pizzastore.example.com/errors/validation")
+                .jsonPath("$.errors.length()").isEqualTo(1)
+                .jsonPath("$.errors[0].field").isEqualTo("email");
 
         verify(customerService, never()).create(any());
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void getCustomer_whenUnexpectedErrorOccurs_shouldReturnProblemDetail() throws Exception {
-        // Arrange
+    @WithMockUser(roles = "ADMIN")
+    void getCustomer_whenUnexpectedErrorOccurs_shouldReturnProblemDetail() {
         when(customerService.findById(1L)).thenThrow(new IllegalStateException("boom"));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/customers/1"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.status", is(500)))
-                .andExpect(jsonPath("$.title", is("Internal Server Error")))
-                .andExpect(jsonPath("$.type", is("https://api.pizzastore.example.com/errors/internal-error")));
+        client.get().uri("/api/customers/{id}", 1)
+                .exchange()
+                .expectStatus().is5xxServerError()
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(500)
+                .jsonPath("$.title").isEqualTo("Internal Server Error")
+                .jsonPath("$.type").isEqualTo("https://api.pizzastore.example.com/errors/internal-error");
 
         verify(customerService).findById(1L);
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void getCustomerOrders_shouldReturnPageOfOrders() throws Exception {
-        // Arrange
-        OrderResponse order1 = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe", 
+    @WithMockUser(roles = "ADMIN")
+    void getCustomerOrders_shouldReturnPageOfOrders() {
+        OrderResponse order1 = new OrderResponse(1L, "ORD-2024-000001", 1L, "John Doe",
                 List.of(), BigDecimal.valueOf(25.50), OrderStatus.PENDING, LocalDateTime.now());
-        OrderResponse order2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe", 
+        OrderResponse order2 = new OrderResponse(2L, "ORD-2024-000002", 1L, "John Doe",
                 List.of(), BigDecimal.valueOf(30.00), OrderStatus.DELIVERED, LocalDateTime.now());
-        Page<OrderResponse> page = new PageImpl<>(Arrays.asList(order1, order2));
-
+        Page<OrderResponse> page = new PageImpl<>(List.of(order1, order2));
         when(orderService.findByCustomerId(eq(1L), any(Pageable.class))).thenReturn(page);
 
-        // Act & Assert
-        mockMvc.perform(get("/api/customers/1/orders")
-                        .param("page", "0")
-                        .param("size", "10"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(2)))
-                .andExpect(jsonPath("$.content[0].orderNumber", is("ORD-2024-000001")))
-                .andExpect(jsonPath("$.content[1].orderNumber", is("ORD-2024-000002")));
+        client.get().uri("/api/customers/{id}/orders?page=0&size=10", 1)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.content.length()").isEqualTo(2)
+                .jsonPath("$.content[0].orderNumber").isEqualTo("ORD-2024-000001")
+                .jsonPath("$.content[1].orderNumber").isEqualTo("ORD-2024-000002");
 
         verify(orderService).findByCustomerId(eq(1L), any(Pageable.class));
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void getFavoritePizzas_shouldReturnListOfPizzas() throws Exception {
-        // Arrange
+    @WithMockUser(roles = "ADMIN")
+    void getFavoritePizzas_shouldReturnListOfPizzas() {
         PizzaResponse pizza1 = new PizzaResponse(1L, "Margherita", BigDecimal.valueOf(8.50), "Classic pizza", null, true, null);
         PizzaResponse pizza2 = new PizzaResponse(2L, "Pepperoni", BigDecimal.valueOf(10.00), "Spicy pizza", null, true, null);
-        List<PizzaResponse> favorites = Arrays.asList(pizza1, pizza2);
+        when(customerService.findFavoritePizzas(1L)).thenReturn(List.of(pizza1, pizza2));
 
-        when(customerService.findFavoritePizzas(1L)).thenReturn(favorites);
-
-        // Act & Assert
-        mockMvc.perform(get("/api/customers/1/favorites"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].name", is("Margherita")))
-                .andExpect(jsonPath("$[0].price", is(8.50)))
-                .andExpect(jsonPath("$[1].name", is("Pepperoni")))
-                .andExpect(jsonPath("$[1].price", is(10.00)));
+        client.get().uri("/api/customers/{id}/favorites", 1)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.length()").isEqualTo(2)
+                .jsonPath("$[0].name").isEqualTo("Margherita")
+                .jsonPath("$[0].price").isEqualTo(8.50)
+                .jsonPath("$[1].name").isEqualTo("Pepperoni")
+                .jsonPath("$[1].price").isEqualTo(10.00);
 
         verify(customerService).findFavoritePizzas(1L);
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void createCustomer_shouldReturnCreatedCustomer() throws Exception {
-        // Arrange
+    void createCustomer_shouldReturnCreatedCustomer() {
         CreateCustomerRequest request = new CreateCustomerRequest(
                 "John Doe", "john@example.com", "password123", "1234567890", "123 Main St");
-        CustomerResponse response = new CustomerResponse(1L, "John Doe", "john@example.com", "1234567890", "123 Main St", "CUSTOMER");
+        when(customerService.create(any(CreateCustomerRequest.class))).thenReturn(john());
 
-        when(customerService.create(any(CreateCustomerRequest.class))).thenReturn(response);
-
-        // Act & Assert
-        mockMvc.perform(post("/api/customers")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(header().exists("Location"))
-                .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/api/customers/1")))
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.name", is("John Doe")))
-                .andExpect(jsonPath("$.email", is("john@example.com")));
+        client.post().uri("/api/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectHeader().valueMatches("Location", ".*/api/customers/1")
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(1)
+                .jsonPath("$.name").isEqualTo("John Doe")
+                .jsonPath("$.email").isEqualTo("john@example.com");
 
         verify(customerService).create(any(CreateCustomerRequest.class));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void updateCustomer_shouldReturnUpdatedCustomer() throws Exception {
-        // Arrange
+    void updateCustomer_shouldReturnUpdatedCustomer() {
         UpdateCustomerRequest request = new UpdateCustomerRequest(
                 "John Doe Updated", "john@example.com", "9998887777", "456 New St");
         CustomerResponse response = new CustomerResponse(1L, "John Doe Updated", "john@example.com", "9998887777", "456 New St", "CUSTOMER");
-
         when(customerService.update(eq(1L), any(UpdateCustomerRequest.class))).thenReturn(response);
 
-        // Act & Assert
-        mockMvc.perform(put("/api/customers/1")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(1)))
-                .andExpect(jsonPath("$.name", is("John Doe Updated")))
-                .andExpect(jsonPath("$.address", is("456 New St")))
-                .andExpect(jsonPath("$.phone", is("9998887777")));
+        client.put().uri("/api/customers/{id}", 1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(1)
+                .jsonPath("$.name").isEqualTo("John Doe Updated")
+                .jsonPath("$.address").isEqualTo("456 New St")
+                .jsonPath("$.phone").isEqualTo("9998887777");
 
         verify(customerService).update(eq(1L), any(UpdateCustomerRequest.class));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void deleteCustomer_shouldReturnNoContent() throws Exception {
-        // Arrange
+    void deleteCustomer_shouldReturnNoContent() {
         doNothing().when(customerService).delete(1L);
 
-        // Act & Assert
-        mockMvc.perform(delete("/api/customers/1")
-                        .with(csrf()))
-                .andExpect(status().isNoContent());
+        client.delete().uri("/api/customers/{id}", 1)
+                .exchange()
+                .expectStatus().isNoContent();
 
         verify(customerService).delete(1L);
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void addFavoritePizza_shouldReturnOk() throws Exception {
-        // Arrange
+    @WithMockUser(roles = "ADMIN")
+    void addFavoritePizza_shouldReturnOk() {
         doNothing().when(customerService).addFavoritePizza(1L, 2L);
 
-        // Act & Assert
-        mockMvc.perform(post("/api/customers/1/favorites/2")
-                        .with(csrf()))
-                .andExpect(status().isOk());
+        client.post().uri("/api/customers/{customerId}/favorites/{pizzaId}", 1, 2)
+                .exchange()
+                .expectStatus().isOk();
 
         verify(customerService).addFavoritePizza(1L, 2L);
     }
 
     @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void removeFavoritePizza_shouldReturnNoContent() throws Exception {
-        // Arrange
+    @WithMockUser(roles = "ADMIN")
+    void removeFavoritePizza_shouldReturnNoContent() {
         doNothing().when(customerService).removeFavoritePizza(1L, 2L);
 
-        // Act & Assert
-        mockMvc.perform(delete("/api/customers/1/favorites/2")
-                        .with(csrf()))
-                .andExpect(status().isNoContent());
+        client.delete().uri("/api/customers/{customerId}/favorites/{pizzaId}", 1, 2)
+                .exchange()
+                .expectStatus().isNoContent();
 
         verify(customerService).removeFavoritePizza(1L, 2L);
+    }
+
+    // ---------- URL rules: outside /me, a customer cannot use /api/customers at all ----------
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void getAllCustomers_withCustomerRole_returnsForbidden() {
+        client.get().uri("/api/customers")
+                .exchange()
+                .expectStatus().isForbidden()
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(403)
+                .jsonPath("$.detail").isEqualTo("Access denied. You do not have permission to access this resource.");
+
+        verify(customerService, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void getCustomer_withCustomerRole_returnsForbidden() {
+        // even with their own id: a customer uses /api/customers/me
+        client.get().uri("/api/customers/{id}", 1)
+                .exchange()
+                .expectStatus().isForbidden();
+
+        verify(customerService, never()).findById(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void updateCustomer_withCustomerRole_returnsForbidden() {
+        client.put().uri("/api/customers/{id}", 2)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new UpdateCustomerRequest("Hacker", "jane@example.com", "1234567890", "Elsewhere 1"))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        verify(customerService, never()).update(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void addFavoritePizza_withCustomerRole_returnsForbidden() {
+        client.post().uri("/api/customers/{id}/favorites/{pizzaId}", 2, 1)
+                .exchange()
+                .expectStatus().isForbidden();
+
+        verify(customerService, never()).addFavoritePizza(any(), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void createCustomer_withCustomerRole_returnsForbidden() {
+        // customers register themselves via /api/auth/register
+        client.post().uri("/api/customers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new CreateCustomerRequest("Jane Doe", "jane@example.com", "password123", null, null))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        verify(customerService, never()).create(any());
     }
 }
